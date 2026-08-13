@@ -4,7 +4,6 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-
 from gateway.conversation.core.models import AgentMessageItem, TurnStatus
 from gateway.conversation.persistence.database import create_sqlite_engine
 from gateway.conversation.persistence.sqlmodel import SQLModelRepository

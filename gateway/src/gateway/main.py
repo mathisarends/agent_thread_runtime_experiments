@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from dishka.integrations.fastapi import setup_dishka
@@ -20,11 +20,13 @@ def create_app(
     container = create_container(config, runner)
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
         service = await container.get(AgentThreadService)
         await service.initialize()
-        yield
-        await container.close()
+        try:
+            yield
+        finally:
+            await container.close()
 
     application = FastAPI(title="Agent Thread Runtime", lifespan=lifespan)
     application.include_router(conversation_router)
@@ -39,7 +41,7 @@ app = create_app()
 def main() -> None:
     import uvicorn
 
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False)
+    uvicorn.run("gateway.main:app", host="127.0.0.1", port=8000, reload=False)
 
 
 if __name__ == "__main__":

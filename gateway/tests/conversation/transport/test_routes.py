@@ -1,7 +1,6 @@
 from collections.abc import AsyncIterator
 
 from fastapi.testclient import TestClient
-
 from gateway.config import Settings
 from gateway.conversation.agents.contracts import (
     AgentContext,
@@ -16,7 +15,7 @@ from gateway.conversation.transport.schemas import (
     GetThreadRequest,
     RpcMethod,
 )
-from main import create_app
+from gateway.main import create_app
 
 
 class ProgressRunner:
@@ -46,8 +45,7 @@ def test_rpc_request_union_uses_method_as_discriminator() -> None:
     assert request.method is RpcMethod.THREAD_GET
 
 
-def test_conversation_types_are_exposed_as_json_schema_and_openapi_components(
-) -> None:
+def test_conversation_types_are_exposed_as_json_schema_and_openapi_components() -> None:
     app = create_app(Settings(database_path=":memory:"), FakeAgentRunner())
 
     with TestClient(app) as client:
@@ -55,9 +53,7 @@ def test_conversation_types_are_exposed_as_json_schema_and_openapi_components(
         openapi = client.get("/openapi.json").json()
 
     assert schema_response.status_code == 200
-    assert schema_response.headers["content-type"].startswith(
-        "application/schema+json"
-    )
+    assert schema_response.headers["content-type"].startswith("application/schema+json")
     protocol_schema = schema_response.json()
     assert "client_message" in protocol_schema["properties"]
     assert "server_message" in protocol_schema["properties"]
@@ -141,9 +137,7 @@ def test_unknown_rpc_method_returns_method_not_found() -> None:
 
     with TestClient(app) as client:
         with client.websocket_connect("/v1/conversation") as socket:
-            socket.send_json(
-                {"jsonrpc": "2.0", "id": 7, "method": "thread.unknown"}
-            )
+            socket.send_json({"jsonrpc": "2.0", "id": 7, "method": "thread.unknown"})
             response = socket.receive_json()
 
     assert response["id"] == 7

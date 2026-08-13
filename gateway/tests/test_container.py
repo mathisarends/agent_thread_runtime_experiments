@@ -1,5 +1,4 @@
 import pytest
-
 from gateway.config import Settings
 from gateway.container import create_container
 from gateway.conversation.agents.contracts import AgentRunner, FakeAgentRunner

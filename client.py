@@ -196,9 +196,7 @@ async def _execute_command(rpc: JsonRpcClient, state: CliState, line: str) -> No
         if mode not in {"off", "on_request", "proactive"}:
             raise ValueError("progress mode must be off, on_request, or proactive")
         target = _current_thread(state)
-        await rpc.request(
-            "thread.subscribe", {"thread_id": target, "progress": mode}
-        )
+        await rpc.request("thread.subscribe", {"thread_id": target, "progress": mode})
         state.progress_modes[target] = mode
         print(f"progress mode: {mode}")
     elif command == "/status":
