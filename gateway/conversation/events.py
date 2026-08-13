@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from .models import Item, ItemType, Schema
+from gateway.conversation.models import Item, ItemType, Schema
 
 
 class TurnStarted(Schema):

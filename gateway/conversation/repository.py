@@ -8,8 +8,8 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, SQLModel, col, select
 
-from .database import ItemRow, ThreadRow, TurnRow
-from .models import (
+from gateway.conversation.database import ItemRow, ThreadRow, TurnRow
+from gateway.conversation.models import (
     Item,
     Thread,
     ThreadSnapshot,

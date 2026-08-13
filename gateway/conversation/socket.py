@@ -6,12 +6,12 @@ from uuid import UUID
 from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
-from .repository import (
+from gateway.conversation.repository import (
     ThreadNotFoundError,
     TurnAlreadyRunningError,
     TurnNotFoundError,
 )
-from .rpc import (
+from gateway.conversation.rpc import (
     EmptyParams,
     RpcErrorData,
     RpcFailure,
@@ -26,7 +26,7 @@ from .rpc import (
     TurnParams,
     UnsubscriptionResult,
 )
-from .service import AgentThreadService
+from gateway.conversation.service import AgentThreadService
 
 
 class Socket(Protocol):

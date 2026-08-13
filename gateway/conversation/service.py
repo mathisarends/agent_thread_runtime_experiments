@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from .agent import (
+from gateway.conversation.agent import (
     AgentContext,
     AgentEvent,
     AgentItemStarted,
@@ -17,8 +17,8 @@ from .agent import (
     ToolResultCreated,
     TurnControl,
 )
-from .context import RepositoryContextBuilder
-from .events import (
+from gateway.conversation.context import RepositoryContextBuilder
+from gateway.conversation.events import (
     EventBroker,
     ItemCompleted,
     ItemDelta,
@@ -29,7 +29,7 @@ from .events import (
     TurnInterrupted,
     TurnStarted,
 )
-from .models import (
+from gateway.conversation.models import (
     AgentMessageItem,
     Item,
     Thread,
@@ -40,7 +40,7 @@ from .models import (
     TurnStatus,
     UserMessageItem,
 )
-from .repository import Repository, TurnNotFoundError
+from gateway.conversation.repository import Repository, TurnNotFoundError
 
 
 class _RunningTurn:

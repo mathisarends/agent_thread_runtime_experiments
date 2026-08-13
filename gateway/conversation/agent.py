@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 
 from pydantic import Field
 
-from .models import Item, ItemType, Schema
+from gateway.conversation.models import Item, ItemType, Schema
 
 
 class AgentContext(Schema):

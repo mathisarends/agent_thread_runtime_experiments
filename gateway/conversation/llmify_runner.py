@@ -18,7 +18,7 @@ from llmify import (
     UserMessage,
 )
 
-from .agent import (
+from gateway.conversation.agent import (
     AgentContext,
     AgentEvent,
     AgentItemStarted,
@@ -28,7 +28,7 @@ from .agent import (
     ToolResultCreated,
     TurnControl,
 )
-from .models import (
+from gateway.conversation.models import (
     AgentMessageItem,
     ToolCallItem,
     ToolResultItem,

@@ -6,15 +6,15 @@ from dishka.integrations.fastapi import FastapiProvider
 from llmify import ChatModel, ChatOpenAI
 from sqlalchemy.engine import Engine
 
-from .config import Settings
-from .conversation.agent import AgentRunner, ContextBuilder
-from .conversation.context import RepositoryContextBuilder
-from .conversation.database import create_sqlite_engine
-from .conversation.events import EventBroker
-from .conversation.llmify_runner import LlmifyAgentRunner
-from .conversation.repository import Repository, SQLModelRepository
-from .conversation.service import AgentThreadService
-from .conversation.tools import default_tools
+from gateway.config import Settings
+from gateway.conversation.agent import AgentRunner, ContextBuilder
+from gateway.conversation.context import RepositoryContextBuilder
+from gateway.conversation.database import create_sqlite_engine
+from gateway.conversation.events import EventBroker
+from gateway.conversation.llmify_runner import LlmifyAgentRunner
+from gateway.conversation.repository import Repository, SQLModelRepository
+from gateway.conversation.service import AgentThreadService
+from gateway.conversation.tools import default_tools
 
 
 class ConversationProvider(Provider):

@@ -1,8 +1,8 @@
 from dishka.integrations.fastapi import FromDishka, inject
 from fastapi import APIRouter, WebSocket
 
-from .service import AgentThreadService
-from .socket import handle_websocket
+from gateway.conversation.service import AgentThreadService
+from gateway.conversation.socket import handle_websocket
 
 
 def create_router() -> APIRouter:
