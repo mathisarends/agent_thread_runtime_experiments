@@ -1,4 +1,3 @@
-from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, FastAPI
@@ -33,25 +32,15 @@ async def conversation_schema() -> JSONResponse:
 def install_schema_router(application: FastAPI) -> None:
     """Expose the schema endpoint and add WebSocket types to OpenAPI components."""
     application.include_router(schema_router)
-    build_openapi = _openapi_factory(application.openapi)
-    object.__setattr__(application, "openapi", build_openapi)
+    openapi_schema = application.openapi()
+    schemas = openapi_schema.setdefault("components", {}).setdefault("schemas", {})
 
-
-def _openapi_factory(
-    base_openapi: Callable[[], dict[str, Any]],
-) -> Callable[[], dict[str, Any]]:
-    def build_openapi() -> dict[str, Any]:
-        document = base_openapi()
-        schemas = document.setdefault("components", {}).setdefault("schemas", {})
-        _add_schema(schemas, "ConversationRequest", CONVERSATION_REQUEST_ADAPTER)
-        _add_schema(
-            schemas,
-            "ConversationServerMessage",
-            CONVERSATION_SERVER_MESSAGE_ADAPTER,
-        )
-        return document
-
-    return build_openapi
+    _add_schema(schemas, "ConversationRequest", CONVERSATION_REQUEST_ADAPTER)
+    _add_schema(
+        schemas,
+        "ConversationServerMessage",
+        CONVERSATION_SERVER_MESSAGE_ADAPTER,
+    )
 
 
 def _add_schema(
