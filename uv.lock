@@ -8,20 +8,30 @@ resolution-markers = [
 
 [manifest]
 members = [
+    "agent-cli",
     "agent-thread-runtime-experiments",
     "gateway",
 ]
 
 [[package]]
-name = "agent-thread-runtime-experiments"
+name = "agent-cli"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "cli" }
 dependencies = [
     { name = "websockets" },
 ]
 
+[package.metadata]
+requires-dist = [{ name = "websockets", specifier = ">=15.0.1" }]
+
+[[package]]
+name = "agent-thread-runtime-experiments"
+version = "0.1.0"
+source = { virtual = "." }
+
 [package.dev-dependencies]
 dev = [
+    { name = "agent-cli" },
     { name = "gateway" },
     { name = "httpx" },
     { name = "mypy" },
@@ -33,10 +43,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "websockets", specifier = ">=15.0.1" }]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "agent-cli", editable = "cli" },
     { name = "gateway", editable = "gateway" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "mypy", specifier = ">=1.14.1" },

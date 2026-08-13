@@ -4,12 +4,11 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = [
-    "websockets>=15.0.1",
-]
+dependencies = []
 
 [dependency-groups]
 dev = [
+    "agent-cli",
     "gateway",
     "httpx>=0.28.1",
     "pre-commit>=4.0.0",
@@ -21,9 +20,10 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["gateway"]
+members = ["cli", "gateway"]
 
 [tool.uv.sources]
+agent-cli = { workspace = true }
 gateway = { workspace = true }
 
 [tool.ruff]
@@ -34,7 +34,7 @@ target-version = "py314"
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+asyncio_mode = "strict"
 
 [tool.mypy]
 python_version = "3.14"
