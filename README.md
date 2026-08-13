@@ -26,6 +26,10 @@ Plain text starts a turn (or steers a currently active turn). Use `/help` for al
 commands, including `/new`, `/use`, `/get`, `/start`, `/steer`, `/interrupt`, and
 the generic `/rpc` protocol escape hatch.
 
+`/subscribe THREAD_ID` streams future events for that thread. It does not replay
+history; use `/use THREAD_ID` followed by `/get` to inspect persisted history.
+Events from subscribed background threads are prefixed with their thread ID.
+
 For a non-interactive end-to-end smoke test:
 
 ```powershell

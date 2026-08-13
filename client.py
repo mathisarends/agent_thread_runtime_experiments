@@ -87,6 +87,7 @@ class CliState:
     thread_id: str | None = None
     active_turn_id: str | None = None
     finished_turn_ids: set[str] = field(default_factory=set)
+    subscribed_thread_ids: set[str] = field(default_factory=set)
 
 
 HELP = """Commands:
@@ -187,12 +188,14 @@ async def _execute_command(rpc: JsonRpcClient, state: CliState, line: str) -> No
         print("interrupt requested")
     elif command == "/subscribe":
         target = argument.strip() or _current_thread(state)
-        result = await rpc.request("thread.subscribe", {"thread_id": target})
-        print(result)
+        await rpc.request("thread.subscribe", {"thread_id": target})
+        state.subscribed_thread_ids.add(target)
+        print(f"subscribed to {target} (future live events only)")
     elif command == "/unsubscribe":
         target = argument.strip() or _current_thread(state)
-        result = await rpc.request("thread.unsubscribe", {"thread_id": target})
-        print(result)
+        await rpc.request("thread.unsubscribe", {"thread_id": target})
+        state.subscribed_thread_ids.discard(target)
+        print(f"unsubscribed from {target}")
     elif command == "/rpc":
         await _raw_rpc(rpc, argument)
     elif command.startswith("/"):
@@ -211,6 +214,7 @@ async def _new_thread(rpc: JsonRpcClient, state: CliState) -> None:
 async def _use_thread(rpc: JsonRpcClient, state: CliState, thread_id: str) -> None:
     snapshot = await rpc.request("thread.get", {"thread_id": thread_id})
     await rpc.request("thread.subscribe", {"thread_id": thread_id})
+    state.subscribed_thread_ids.add(thread_id)
     state.thread_id = thread_id
     active = next(
         (turn for turn in snapshot["turns"] if turn["status"] == "running"), None
@@ -254,8 +258,13 @@ async def _raw_rpc(rpc: JsonRpcClient, argument: str) -> None:
 
 async def _print_notifications(rpc: JsonRpcClient, state: CliState) -> None:
     async for event in rpc.notifications():
-        if event.get("thread_id") != state.thread_id:
-            continue
+        _process_notification(state, event)
+
+
+def _process_notification(state: CliState, event: dict[str, Any]) -> None:
+    thread_id = event.get("thread_id")
+    is_current = thread_id == state.thread_id
+    if is_current:
         if event["type"] == "turn.started":
             state.active_turn_id = event["turn_id"]
         elif event["type"] in {
@@ -265,25 +274,26 @@ async def _print_notifications(rpc: JsonRpcClient, state: CliState) -> None:
         }:
             state.finished_turn_ids.add(event["turn_id"])
             state.active_turn_id = None
-        _render_event(event)
+    _render_event(event, thread_id=None if is_current else thread_id)
 
 
-def _render_event(event: dict[str, Any]) -> None:
+def _render_event(event: dict[str, Any], *, thread_id: str | None = None) -> None:
+    prefix = f"[thread {thread_id}] " if thread_id is not None else ""
     event_type = event["type"]
     if event_type == "item.completed":
         item = event["item"]
         if item["type"] == "user_message":
-            print(f"\nuser> {item['content']}")
+            print(f"\n{prefix}user> {item['content']}")
         elif item["type"] == "agent_message":
-            print(f"\nagent> {item['content']}")
+            print(f"\n{prefix}agent> {item['content']}")
         elif item["type"] == "tool_call":
-            print(f"\ntool> {item['name']} {json.dumps(item['arguments'])}")
+            print(f"\n{prefix}tool> {item['name']} {json.dumps(item['arguments'])}")
         elif item["type"] == "tool_result":
-            print(f"\nresult> {json.dumps(item['output'], ensure_ascii=False)}")
+            print(f"\n{prefix}result> {json.dumps(item['output'], ensure_ascii=False)}")
     elif event_type == "turn.failed":
-        print(f"\n[turn failed: {event['error']}]")
+        print(f"\n{prefix}[turn failed: {event['error']}]")
     elif event_type.startswith("turn.") and event_type != "turn.started":
-        print(f"\n[{event_type}]")
+        print(f"\n{prefix}[{event_type}]")
 
 
 def _current_thread(state: CliState) -> str:
