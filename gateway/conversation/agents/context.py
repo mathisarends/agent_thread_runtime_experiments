@@ -1,7 +1,7 @@
 from uuid import UUID
 
-from gateway.conversation.agent import AgentContext
-from gateway.conversation.repository import Repository
+from gateway.conversation.agents.contracts import AgentContext
+from gateway.conversation.persistence.repository import Repository
 
 
 class RepositoryContextBuilder:

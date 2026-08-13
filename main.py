@@ -6,9 +6,9 @@ from fastapi import FastAPI
 
 from gateway.config import Settings
 from gateway.container import create_container
-from gateway.conversation.agent import AgentRunner
-from gateway.conversation.routes import create_router
-from gateway.conversation.service import AgentThreadService
+from gateway.conversation.agents.contracts import AgentRunner
+from gateway.conversation.core.service import AgentThreadService
+from gateway.conversation.transport.routes import router as conversation_router
 
 
 def create_app(
@@ -27,7 +27,7 @@ def create_app(
         await container.close()
 
     application = FastAPI(title="Agent Thread Runtime", lifespan=lifespan)
-    application.include_router(create_router())
+    application.include_router(conversation_router)
     setup_dishka(container, application)
     return application
 

@@ -18,7 +18,7 @@ from llmify import (
     UserMessage,
 )
 
-from gateway.conversation.agent import (
+from gateway.conversation.agents.contracts import (
     AgentContext,
     AgentEvent,
     AgentItemStarted,
@@ -29,7 +29,7 @@ from gateway.conversation.agent import (
     ToolResultCreated,
     TurnControl,
 )
-from gateway.conversation.models import (
+from gateway.conversation.core.models import (
     AgentMessageItem,
     ItemType,
     ToolCallItem,

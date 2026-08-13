@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator
 from fastapi.testclient import TestClient
 
 from gateway.config import Settings
-from gateway.conversation.agent import (
+from gateway.conversation.agents.contracts import (
     AgentContext,
     AgentEvent,
     AgentMessageCreated,

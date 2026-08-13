@@ -1,6 +1,5 @@
 import asyncio
 from datetime import UTC, datetime
-from typing import Protocol
 from uuid import UUID
 
 from pydantic import TypeAdapter
@@ -8,8 +7,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, SQLModel, col, select
 
-from gateway.conversation.database import ItemRow, ThreadRow, TurnRow
-from gateway.conversation.models import (
+from gateway.conversation.core.models import (
     Item,
     Thread,
     ThreadSnapshot,
@@ -17,40 +15,18 @@ from gateway.conversation.models import (
     TurnStatus,
     UserMessageItem,
 )
-
-
-class ThreadNotFoundError(LookupError):
-    pass
-
-
-class TurnNotFoundError(LookupError):
-    pass
-
-
-class TurnAlreadyRunningError(RuntimeError):
-    pass
-
-
-class Repository(Protocol):
-    async def initialize(self) -> None: ...
-
-    async def create_thread(self, thread: Thread) -> None: ...
-
-    async def get_thread(self, thread_id: UUID) -> ThreadSnapshot: ...
-
-    async def create_turn(self, turn: Turn, initial_item: UserMessageItem) -> None: ...
-
-    async def add_item(self, item: Item) -> None: ...
-
-    async def finish_turn(
-        self, turn_id: UUID, status: TurnStatus, completed_at: datetime
-    ) -> None: ...
-
+from gateway.conversation.persistence.database import ItemRow, ThreadRow, TurnRow
+from gateway.conversation.persistence.repository import (
+    Repository,
+    ThreadNotFoundError,
+    TurnAlreadyRunningError,
+    TurnNotFoundError,
+)
 
 _ITEM_ADAPTER: TypeAdapter[Item] = TypeAdapter(Item)
 
 
-class SQLModelRepository:
+class SQLModelRepository(Repository):
     """SQLModel persistence with short sessions and serialized writes."""
 
     def __init__(self, engine: Engine) -> None:
@@ -60,16 +36,20 @@ class SQLModelRepository:
     async def initialize(self) -> None:
         async with self._lock:
             SQLModel.metadata.create_all(self._engine)
-            with Session(self._engine) as session:
-                running = session.exec(
-                    select(TurnRow).where(TurnRow.status == TurnStatus.RUNNING)
-                ).all()
-                now = datetime.now(UTC)
-                for row in running:
-                    row.status = TurnStatus.INTERRUPTED
-                    row.completed_at = now
-                    session.add(row)
-                session.commit()
+            self._recover_running_turns()
+
+    def _recover_running_turns(self) -> None:
+        """Mark turns abandoned by a previous process as interrupted."""
+        with Session(self._engine) as session:
+            running_turns = session.exec(
+                select(TurnRow).where(TurnRow.status == TurnStatus.RUNNING)
+            ).all()
+            interrupted_at = datetime.now(UTC)
+            for turn in running_turns:
+                turn.status = TurnStatus.INTERRUPTED
+                turn.completed_at = interrupted_at
+                session.add(turn)
+            session.commit()
 
     async def create_thread(self, thread: Thread) -> None:
         async with self._lock:

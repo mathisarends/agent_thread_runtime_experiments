@@ -14,17 +14,25 @@ gateway/
 ├── config.py                 Pydantic application settings
 ├── container.py              Dishka composition root
 └── conversation/
-    ├── models.py             Pydantic domain schemas
-    ├── events.py             Pydantic event schemas and live broker
-    ├── database.py           SQLModel tables and SQLite engine
-    ├── repository.py         persistence boundary and mappings
-    ├── agent.py              runner protocol and control channel
-    ├── context.py            persisted-context builder
-    ├── llmify_runner.py      minimal real LLM adapter
-    ├── service.py            canonical orchestration
-    ├── rpc.py                JSON-RPC Pydantic schemas
-    ├── socket.py             connection handling
-    └── routes.py             injected WebSocket route
+    ├── core/                  domain and orchestration
+    │   ├── models.py
+    │   ├── events.py
+    │   ├── progress.py
+    │   └── service.py
+    ├── agents/                agent boundary and integrations
+    │   ├── contracts.py
+    │   ├── context.py
+    │   ├── llmify.py
+    │   └── tools.py
+    ├── persistence/           persistence boundary and SQLModel adapter
+    │   ├── repository.py
+    │   ├── database.py
+    │   └── sqlmodel.py
+    └── transport/             WebSocket JSON-RPC transport
+        ├── schemas.py
+        ├── methods.py
+        ├── connection.py
+        └── routes.py
 ```
 
 The only network endpoint is a long-lived JSON-RPC 2.0 WebSocket:

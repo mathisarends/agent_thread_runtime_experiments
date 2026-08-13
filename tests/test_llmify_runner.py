@@ -17,7 +17,7 @@ from llmify import (
     UserMessage,
 )
 
-from gateway.conversation.agent import (
+from gateway.conversation.agents.contracts import (
     AgentContext,
     AgentItemStarted,
     AgentMessageCreated,
@@ -27,9 +27,9 @@ from gateway.conversation.agent import (
     ToolResultCreated,
     TurnControl,
 )
-from gateway.conversation.llmify_runner import LlmifyAgentRunner
-from gateway.conversation.models import AgentMessageItem, UserMessageItem
-from gateway.conversation.tools import default_tools
+from gateway.conversation.agents.llmify import LlmifyAgentRunner
+from gateway.conversation.agents.tools import default_tools
+from gateway.conversation.core.models import AgentMessageItem, UserMessageItem
 
 
 class RecordingModel:

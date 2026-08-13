@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator
 
 import pytest
 
-from gateway.conversation.agent import (
+from gateway.conversation.agents.contracts import (
     AgentContext,
     AgentEvent,
     AgentMessageCreated,
@@ -13,14 +13,16 @@ from gateway.conversation.agent import (
     ToolResultCreated,
     TurnControl,
 )
-from gateway.conversation.database import create_sqlite_engine
-from gateway.conversation.events import ThreadEvent
-from gateway.conversation.models import AgentMessageItem, TurnStatus, UserMessageItem
-from gateway.conversation.repository import (
-    SQLModelRepository,
-    TurnAlreadyRunningError,
+from gateway.conversation.core.events import ThreadEvent
+from gateway.conversation.core.models import (
+    AgentMessageItem,
+    TurnStatus,
+    UserMessageItem,
 )
-from gateway.conversation.service import AgentThreadService
+from gateway.conversation.core.service import AgentThreadService
+from gateway.conversation.persistence.database import create_sqlite_engine
+from gateway.conversation.persistence.repository import TurnAlreadyRunningError
+from gateway.conversation.persistence.sqlmodel import SQLModelRepository
 
 
 class EchoRunner:

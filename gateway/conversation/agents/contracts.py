@@ -6,8 +6,8 @@ from uuid import UUID, uuid4
 
 from pydantic import Field
 
-from gateway.conversation.models import Item, ItemType, Schema
-from gateway.conversation.progress import ProgressImportance, ProgressMessage
+from gateway.conversation.core.models import Item, ItemType, Schema
+from gateway.conversation.core.progress import ProgressImportance, ProgressMessage
 
 
 class AgentContext(Schema):

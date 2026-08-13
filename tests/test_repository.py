@@ -5,9 +5,9 @@ from uuid import uuid4
 
 import pytest
 
-from gateway.conversation.database import create_sqlite_engine
-from gateway.conversation.models import AgentMessageItem, TurnStatus
-from gateway.conversation.repository import SQLModelRepository
+from gateway.conversation.core.models import AgentMessageItem, TurnStatus
+from gateway.conversation.persistence.database import create_sqlite_engine
+from gateway.conversation.persistence.sqlmodel import SQLModelRepository
 
 
 @pytest.mark.asyncio

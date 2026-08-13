@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from gateway.conversation.models import Schema
+from gateway.conversation.core.models import Schema
 
 type ProgressMessage = Annotated[str, Field(min_length=1, max_length=240)]
 

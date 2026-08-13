@@ -7,8 +7,8 @@ from uuid import UUID
 
 from pydantic import Field
 
-from gateway.conversation.models import Item, ItemType, Schema
-from gateway.conversation.progress import (
+from gateway.conversation.core.models import Item, ItemType, Schema
+from gateway.conversation.core.progress import (
     ProgressImportance,
     ProgressMessage,
     ProgressMode,

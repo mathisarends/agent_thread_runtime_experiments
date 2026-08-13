@@ -3,18 +3,18 @@ from collections.abc import AsyncIterator
 
 import pytest
 
-from gateway.conversation.agent import (
+from gateway.conversation.agents.contracts import (
     AgentContext,
     AgentEvent,
     AgentProgressUpdated,
     AgentRunner,
     TurnControl,
 )
-from gateway.conversation.database import create_sqlite_engine
-from gateway.conversation.events import EventBroker, TurnProgress
-from gateway.conversation.progress import ProgressMode
-from gateway.conversation.repository import SQLModelRepository
-from gateway.conversation.service import AgentThreadService
+from gateway.conversation.core.events import EventBroker, TurnProgress
+from gateway.conversation.core.progress import ProgressMode
+from gateway.conversation.core.service import AgentThreadService
+from gateway.conversation.persistence.database import create_sqlite_engine
+from gateway.conversation.persistence.sqlmodel import SQLModelRepository
 
 
 class ProgressRunner:

@@ -2,8 +2,8 @@ import pytest
 
 from gateway.config import Settings
 from gateway.container import create_container
-from gateway.conversation.agent import AgentRunner, FakeAgentRunner
-from gateway.conversation.llmify_runner import LlmifyAgentRunner
+from gateway.conversation.agents.contracts import AgentRunner, FakeAgentRunner
+from gateway.conversation.agents.llmify import LlmifyAgentRunner
 
 
 @pytest.mark.asyncio

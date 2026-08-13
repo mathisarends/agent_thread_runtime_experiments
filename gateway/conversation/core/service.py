@@ -3,7 +3,8 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from gateway.conversation.agent import (
+from gateway.conversation.agents.context import RepositoryContextBuilder
+from gateway.conversation.agents.contracts import (
     AgentContext,
     AgentEvent,
     AgentItemStarted,
@@ -18,8 +19,7 @@ from gateway.conversation.agent import (
     ToolResultCreated,
     TurnControl,
 )
-from gateway.conversation.context import RepositoryContextBuilder
-from gateway.conversation.events import (
+from gateway.conversation.core.events import (
     EventBroker,
     ItemCompleted,
     ItemDelta,
@@ -31,7 +31,7 @@ from gateway.conversation.events import (
     TurnProgress,
     TurnStarted,
 )
-from gateway.conversation.models import (
+from gateway.conversation.core.models import (
     AgentMessageItem,
     Item,
     ItemType,
@@ -43,12 +43,12 @@ from gateway.conversation.models import (
     TurnStatus,
     UserMessageItem,
 )
-from gateway.conversation.progress import (
+from gateway.conversation.core.progress import (
     ProgressMode,
     ProgressResult,
     ProgressSnapshot,
 )
-from gateway.conversation.repository import Repository, TurnNotFoundError
+from gateway.conversation.persistence.repository import Repository, TurnNotFoundError
 
 
 class _RunningTurn:

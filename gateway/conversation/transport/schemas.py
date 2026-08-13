@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from gateway.conversation.progress import ProgressMode
+from gateway.conversation.core.progress import ProgressMode
 
 
 class RpcSchema(BaseModel):

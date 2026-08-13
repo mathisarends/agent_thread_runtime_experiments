@@ -7,14 +7,15 @@ from llmify import ChatModel, ChatOpenAI
 from sqlalchemy.engine import Engine
 
 from gateway.config import Settings
-from gateway.conversation.agent import AgentRunner, ContextBuilder
-from gateway.conversation.context import RepositoryContextBuilder
-from gateway.conversation.database import create_sqlite_engine
-from gateway.conversation.events import EventBroker
-from gateway.conversation.llmify_runner import LlmifyAgentRunner
-from gateway.conversation.repository import Repository, SQLModelRepository
-from gateway.conversation.service import AgentThreadService
-from gateway.conversation.tools import default_tools
+from gateway.conversation.agents.context import RepositoryContextBuilder
+from gateway.conversation.agents.contracts import AgentRunner, ContextBuilder
+from gateway.conversation.agents.llmify import LlmifyAgentRunner
+from gateway.conversation.agents.tools import default_tools
+from gateway.conversation.core.events import EventBroker
+from gateway.conversation.core.service import AgentThreadService
+from gateway.conversation.persistence.database import create_sqlite_engine
+from gateway.conversation.persistence.repository import Repository
+from gateway.conversation.persistence.sqlmodel import SQLModelRepository
 
 
 class ConversationProvider(Provider):
