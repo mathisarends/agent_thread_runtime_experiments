@@ -26,6 +26,9 @@ htmlcov/
 .tox/
 .nox/
 
+# Local runtime state
+agent_threads.db
+
 # Type checking
 .mypy_cache/
 .dmypy.json
