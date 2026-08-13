@@ -1,76 +1,72 @@
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import suppress
-from dataclasses import dataclass
+from typing import Annotated, Literal
 from uuid import UUID
 
-from .models import Item
+from pydantic import Field
+
+from .models import Item, Schema
 
 
-@dataclass(frozen=True, slots=True)
-class TurnStarted:
+class TurnStarted(Schema):
     thread_id: UUID
     turn_id: UUID
-    type: str = "turn.started"
+    type: Literal["turn.started"] = "turn.started"
 
 
-@dataclass(frozen=True, slots=True)
-class ItemStarted:
+class ItemStarted(Schema):
     thread_id: UUID
     turn_id: UUID
     item_id: UUID
     item_type: str
-    type: str = "item.started"
+    type: Literal["item.started"] = "item.started"
 
 
-@dataclass(frozen=True, slots=True)
-class ItemDelta:
+class ItemDelta(Schema):
     thread_id: UUID
     turn_id: UUID
     item_id: UUID
     delta: str
-    type: str = "item.delta"
+    type: Literal["item.delta"] = "item.delta"
 
 
-@dataclass(frozen=True, slots=True)
-class ItemCompleted:
+class ItemCompleted(Schema):
     thread_id: UUID
     turn_id: UUID
     item: Item
-    type: str = "item.completed"
+    type: Literal["item.completed"] = "item.completed"
 
 
-@dataclass(frozen=True, slots=True)
-class TurnCompleted:
+class TurnCompleted(Schema):
     thread_id: UUID
     turn_id: UUID
-    type: str = "turn.completed"
+    type: Literal["turn.completed"] = "turn.completed"
 
 
-@dataclass(frozen=True, slots=True)
-class TurnInterrupted:
+class TurnInterrupted(Schema):
     thread_id: UUID
     turn_id: UUID
-    type: str = "turn.interrupted"
+    type: Literal["turn.interrupted"] = "turn.interrupted"
 
 
-@dataclass(frozen=True, slots=True)
-class TurnFailed:
+class TurnFailed(Schema):
     thread_id: UUID
     turn_id: UUID
     error: str
-    type: str = "turn.failed"
+    type: Literal["turn.failed"] = "turn.failed"
 
 
-type ThreadEvent = (
+type ThreadEvent = Annotated[
     TurnStarted
     | ItemStarted
     | ItemDelta
     | ItemCompleted
     | TurnCompleted
     | TurnInterrupted
-    | TurnFailed
-)
+    | TurnFailed,
+    Field(discriminator="type"),
+]
 
 
 class EventBroker:

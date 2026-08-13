@@ -1,18 +1,18 @@
 import asyncio
-import json
-import sqlite3
 from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any, Protocol
+from typing import Protocol
 from uuid import UUID
 
+from pydantic import TypeAdapter
+from sqlalchemy.engine import Engine
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import Session, SQLModel, col, select
+
+from .database import ItemRow, ThreadRow, TurnRow
 from .models import (
-    AgentMessageItem,
     Item,
     Thread,
     ThreadSnapshot,
-    ToolCallItem,
-    ToolResultItem,
     Turn,
     TurnStatus,
     UserMessageItem,
@@ -47,133 +47,78 @@ class Repository(Protocol):
     ) -> None: ...
 
 
-class SQLiteRepository:
-    """Small async facade over SQLite; writes are serialized per repository."""
+_ITEM_ADAPTER: TypeAdapter[Item] = TypeAdapter(Item)
 
-    def __init__(self, path: str | Path = "agent_threads.db") -> None:
-        self._path = str(path)
-        self._connection: sqlite3.Connection | None = None
+
+class SQLModelRepository:
+    """SQLModel persistence with short sessions and serialized writes."""
+
+    def __init__(self, engine: Engine) -> None:
+        self._engine = engine
         self._lock = asyncio.Lock()
 
     async def initialize(self) -> None:
         async with self._lock:
-            if self._connection is not None:
-                return
-            connection = sqlite3.connect(self._path, check_same_thread=False)
-            connection.row_factory = sqlite3.Row
-            connection.execute("PRAGMA foreign_keys = ON")
-            connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS threads (
-                    id TEXT PRIMARY KEY,
-                    created_at TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS turns (
-                    id TEXT PRIMARY KEY,
-                    thread_id TEXT NOT NULL REFERENCES threads(id),
-                    status TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    completed_at TEXT
-                );
-                CREATE UNIQUE INDEX IF NOT EXISTS one_running_turn_per_thread
-                    ON turns(thread_id) WHERE status = 'running';
-                CREATE TABLE IF NOT EXISTS items (
-                    id TEXT PRIMARY KEY,
-                    thread_id TEXT NOT NULL REFERENCES threads(id),
-                    turn_id TEXT NOT NULL REFERENCES turns(id),
-                    type TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    payload TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS items_by_thread
-                    ON items(thread_id, created_at);
-                """
-            )
-            now = datetime.now(UTC).isoformat()
-            connection.execute(
-                """UPDATE turns SET status = ?, completed_at = ?
-                   WHERE status = ?""",
-                (TurnStatus.INTERRUPTED, now, TurnStatus.RUNNING),
-            )
-            connection.commit()
-            self._connection = connection
-
-    async def close(self) -> None:
-        async with self._lock:
-            if self._connection is not None:
-                self._connection.close()
-                self._connection = None
-
-    def _db(self) -> sqlite3.Connection:
-        if self._connection is None:
-            raise RuntimeError("repository has not been initialized")
-        return self._connection
+            SQLModel.metadata.create_all(self._engine)
+            with Session(self._engine) as session:
+                running = session.exec(
+                    select(TurnRow).where(TurnRow.status == TurnStatus.RUNNING)
+                ).all()
+                now = datetime.now(UTC)
+                for row in running:
+                    row.status = TurnStatus.INTERRUPTED
+                    row.completed_at = now
+                    session.add(row)
+                session.commit()
 
     async def create_thread(self, thread: Thread) -> None:
         async with self._lock:
-            self._db().execute(
-                "INSERT INTO threads (id, created_at) VALUES (?, ?)",
-                (str(thread.id), thread.created_at.isoformat()),
-            )
-            self._db().commit()
+            with Session(self._engine) as session:
+                session.add(ThreadRow(id=str(thread.id), created_at=thread.created_at))
+                session.commit()
 
     async def get_thread(self, thread_id: UUID) -> ThreadSnapshot:
-        async with self._lock:
-            db = self._db()
-            thread_row = db.execute(
-                "SELECT id, created_at FROM threads WHERE id = ?", (str(thread_id),)
-            ).fetchone()
+        with Session(self._engine) as session:
+            thread_row = session.get(ThreadRow, str(thread_id))
             if thread_row is None:
                 raise ThreadNotFoundError(str(thread_id))
-            turn_rows = db.execute(
-                """SELECT id, thread_id, status, created_at, completed_at
-                   FROM turns WHERE thread_id = ? ORDER BY created_at, rowid""",
-                (str(thread_id),),
-            ).fetchall()
-            item_rows = db.execute(
-                """SELECT id, thread_id, turn_id, type, created_at, payload
-                   FROM items WHERE thread_id = ? ORDER BY created_at, rowid""",
-                (str(thread_id),),
-            ).fetchall()
-        thread = Thread(UUID(thread_row["id"]), _datetime(thread_row["created_at"]))
-        turns = tuple(_turn(row) for row in turn_rows)
-        items = tuple(_item(row) for row in item_rows)
-        return ThreadSnapshot(thread=thread, turns=turns, items=items)
+            turn_rows = session.exec(
+                select(TurnRow)
+                .where(TurnRow.thread_id == str(thread_id))
+                .order_by(col(TurnRow.created_at), col(TurnRow.id))
+            ).all()
+            item_rows = session.exec(
+                select(ItemRow)
+                .where(ItemRow.thread_id == str(thread_id))
+                .order_by(col(ItemRow.created_at), col(ItemRow.id))
+            ).all()
+        return ThreadSnapshot(
+            thread=_thread_from_row(thread_row),
+            turns=tuple(_turn_from_row(row) for row in turn_rows),
+            items=tuple(_item_from_row(row) for row in item_rows),
+        )
 
     async def create_turn(self, turn: Turn, initial_item: UserMessageItem) -> None:
         async with self._lock:
-            db = self._db()
-            if (
-                db.execute(
-                    "SELECT 1 FROM threads WHERE id = ?", (str(turn.thread_id),)
-                ).fetchone()
-                is None
-            ):
-                raise ThreadNotFoundError(str(turn.thread_id))
-            try:
-                with db:
-                    db.execute(
-                        """INSERT INTO turns
-                           (id, thread_id, status, created_at, completed_at)
-                           VALUES (?, ?, ?, ?, NULL)""",
-                        (
-                            str(turn.id),
-                            str(turn.thread_id),
-                            turn.status,
-                            turn.created_at.isoformat(),
-                        ),
-                    )
-                    self._insert_item(db, initial_item)
-            except sqlite3.IntegrityError as error:
-                if "turns.thread_id" in str(error):
-                    raise TurnAlreadyRunningError(str(turn.thread_id)) from error
-                raise
+            with Session(self._engine) as session:
+                if session.get(ThreadRow, str(turn.thread_id)) is None:
+                    raise ThreadNotFoundError(str(turn.thread_id))
+                try:
+                    session.add(_turn_to_row(turn))
+                    session.flush()
+                    session.add(_item_to_row(initial_item))
+                    session.commit()
+                except IntegrityError as error:
+                    session.rollback()
+                    if "turns.thread_id" in str(error):
+                        raise TurnAlreadyRunningError(str(turn.thread_id)) from error
+                    raise
 
     async def add_item(self, item: Item) -> None:
         async with self._lock:
-            db = self._db()
-            with db:
-                self._insert_item(db, item)
+            with Session(self._engine) as session:
+                session.add(_item_to_row(item))
+                session.commit()
 
     async def finish_turn(
         self, turn_id: UUID, status: TurnStatus, completed_at: datetime
@@ -181,95 +126,62 @@ class SQLiteRepository:
         if status is TurnStatus.RUNNING:
             raise ValueError("a finished turn cannot have running status")
         async with self._lock:
-            cursor = self._db().execute(
-                """UPDATE turns SET status = ?, completed_at = ?
-                   WHERE id = ? AND status = ?""",
-                (
-                    status,
-                    completed_at.isoformat(),
-                    str(turn_id),
-                    TurnStatus.RUNNING,
-                ),
-            )
-            self._db().commit()
-            if cursor.rowcount == 0:
-                raise TurnNotFoundError(str(turn_id))
-
-    @staticmethod
-    def _insert_item(db: sqlite3.Connection, item: Item) -> None:
-        payload: dict[str, Any]
-        if isinstance(item, (UserMessageItem, AgentMessageItem)):
-            payload = {"content": item.content}
-        elif isinstance(item, ToolCallItem):
-            payload = {
-                "name": item.name,
-                "arguments": item.arguments,
-                "call_id": item.call_id,
-            }
-        else:
-            payload = {"call_id": item.call_id, "output": item.output}
-        db.execute(
-            """INSERT INTO items
-               (id, thread_id, turn_id, type, created_at, payload)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (
-                str(item.id),
-                str(item.thread_id),
-                str(item.turn_id),
-                item.type,
-                item.created_at.isoformat(),
-                json.dumps(payload),
-            ),
-        )
+            with Session(self._engine) as session:
+                row = session.get(TurnRow, str(turn_id))
+                if row is None or row.status != TurnStatus.RUNNING:
+                    raise TurnNotFoundError(str(turn_id))
+                row.status = status
+                row.completed_at = completed_at
+                session.add(row)
+                session.commit()
 
 
-def _datetime(value: str) -> datetime:
-    return datetime.fromisoformat(value)
+def _thread_from_row(row: ThreadRow) -> Thread:
+    return Thread(id=UUID(row.id), created_at=row.created_at)
 
 
-def _turn(row: sqlite3.Row) -> Turn:
-    completed = row["completed_at"]
-    return Turn(
-        id=UUID(row["id"]),
-        thread_id=UUID(row["thread_id"]),
-        status=TurnStatus(row["status"]),
-        created_at=_datetime(row["created_at"]),
-        completed_at=_datetime(completed) if completed else None,
+def _turn_to_row(turn: Turn) -> TurnRow:
+    return TurnRow(
+        id=str(turn.id),
+        thread_id=str(turn.thread_id),
+        status=turn.status,
+        created_at=turn.created_at,
+        completed_at=turn.completed_at,
     )
 
 
-def _item(row: sqlite3.Row) -> Item:
-    item_id = UUID(row["id"])
-    thread_id = UUID(row["thread_id"])
-    turn_id = UUID(row["turn_id"])
-    created_at = _datetime(row["created_at"])
-    payload = json.loads(row["payload"])
-    item_type = row["type"]
-    if item_type == "user_message":
-        return UserMessageItem(
-            item_id, thread_id, turn_id, created_at, content=payload["content"]
-        )
-    if item_type == "agent_message":
-        return AgentMessageItem(
-            item_id, thread_id, turn_id, created_at, content=payload["content"]
-        )
-    if item_type == "tool_call":
-        return ToolCallItem(
-            item_id,
-            thread_id,
-            turn_id,
-            created_at,
-            name=payload["name"],
-            arguments=payload["arguments"],
-            call_id=payload["call_id"],
-        )
-    if item_type == "tool_result":
-        return ToolResultItem(
-            item_id,
-            thread_id,
-            turn_id,
-            created_at,
-            call_id=payload["call_id"],
-            output=payload["output"],
-        )
-    raise ValueError(f"unknown item type: {item_type}")
+def _turn_from_row(row: TurnRow) -> Turn:
+    return Turn(
+        id=UUID(row.id),
+        thread_id=UUID(row.thread_id),
+        status=TurnStatus(row.status),
+        created_at=row.created_at,
+        completed_at=row.completed_at,
+    )
+
+
+def _item_to_row(item: Item) -> ItemRow:
+    payload = item.model_dump(
+        mode="json", exclude={"id", "thread_id", "turn_id", "created_at", "type"}
+    )
+    return ItemRow(
+        id=str(item.id),
+        thread_id=str(item.thread_id),
+        turn_id=str(item.turn_id),
+        type=item.type,
+        created_at=item.created_at,
+        payload=payload,
+    )
+
+
+def _item_from_row(row: ItemRow) -> Item:
+    return _ITEM_ADAPTER.validate_python(
+        {
+            "id": row.id,
+            "thread_id": row.thread_id,
+            "turn_id": row.turn_id,
+            "created_at": row.created_at,
+            "type": row.type,
+            **row.payload,
+        }
+    )

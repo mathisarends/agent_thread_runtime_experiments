@@ -1,20 +1,14 @@
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from gateway.config import Settings
 from gateway.conversation.agent import FakeAgentRunner
-from gateway.conversation.repository import SQLiteRepository
-from gateway.conversation.routes import create_router
-from gateway.conversation.service import AgentThreadService
+from main import create_app
 
 
 def test_json_rpc_commands_and_events_share_one_websocket() -> None:
-    repository = SQLiteRepository(":memory:")
-    service = AgentThreadService(repository, FakeAgentRunner())
-    app = FastAPI()
-    app.include_router(create_router(service))
+    app = create_app(Settings(database_path=":memory:"), FakeAgentRunner())
 
     with TestClient(app) as client:
-        client.portal.call(service.initialize)
         with client.websocket_connect("/v1/conversation") as socket:
             socket.send_json({"jsonrpc": "2.0", "id": 1, "method": "thread.create"})
             created = socket.receive_json()
@@ -51,3 +45,23 @@ def test_json_rpc_commands_and_events_share_one_websocket() -> None:
         "item.completed",
         "turn.completed",
     ]
+
+
+def test_json_rpc_params_are_validated_by_pydantic() -> None:
+    app = create_app(Settings(database_path=":memory:"), FakeAgentRunner())
+
+    with TestClient(app) as client:
+        with client.websocket_connect("/v1/conversation") as socket:
+            socket.send_json(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "thread.get",
+                    "params": {"thread_id": "not-a-uuid", "extra": True},
+                }
+            )
+            response = socket.receive_json()
+
+    assert response["id"] == 1
+    assert response["error"]["code"] == -32602
+    assert "Invalid params" in response["error"]["message"]

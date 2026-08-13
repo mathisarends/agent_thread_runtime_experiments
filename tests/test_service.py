@@ -13,10 +13,11 @@ from gateway.conversation.agent import (
     ToolResultCreated,
     TurnControl,
 )
+from gateway.conversation.database import create_sqlite_engine
 from gateway.conversation.events import ThreadEvent
 from gateway.conversation.models import AgentMessageItem, TurnStatus, UserMessageItem
 from gateway.conversation.repository import (
-    SQLiteRepository,
+    SQLModelRepository,
     TurnAlreadyRunningError,
 )
 from gateway.conversation.service import AgentThreadService
@@ -27,7 +28,7 @@ class EchoRunner:
         self, context: AgentContext, input: str, control: TurnControl
     ) -> AsyncIterator[AgentEvent]:
         del context, control
-        yield AgentMessageCreated(f"Echo: {input}")
+        yield AgentMessageCreated(content=f"Echo: {input}")
 
 
 class ControlledRunner:
@@ -41,7 +42,7 @@ class ControlledRunner:
         self.started.set()
         message = await control.receive_one()
         if isinstance(message, Steer):
-            yield AgentMessageCreated(f"Steered: {message.message}")
+            yield AgentMessageCreated(content=f"Steered: {message.message}")
         elif isinstance(message, Interrupt):
             return
 
@@ -51,9 +52,13 @@ class ToolRunner:
         self, context: AgentContext, input: str, control: TurnControl
     ) -> AsyncIterator[AgentEvent]:
         del context, input, control
-        yield ToolCallCreated("spotify.search", {"query": "Believer"}, "call-1")
-        yield ToolResultCreated("call-1", {"track": "Believer"})
-        yield AgentMessageCreated("Believer is now playing.")
+        yield ToolCallCreated(
+            name="spotify.search",
+            arguments={"query": "Believer"},
+            call_id="call-1",
+        )
+        yield ToolResultCreated(call_id="call-1", output={"track": "Believer"})
+        yield AgentMessageCreated(content="Believer is now playing.")
 
 
 async def collect_events(
@@ -72,7 +77,7 @@ async def collect_events(
 
 @pytest.mark.asyncio
 async def test_turn_is_persisted_and_fanned_out_in_order() -> None:
-    repository = SQLiteRepository(":memory:")
+    repository = SQLModelRepository(create_sqlite_engine(":memory:"))
     service = AgentThreadService(repository, EchoRunner())
     await service.initialize()
     thread = await service.create_thread()
@@ -105,7 +110,7 @@ async def test_turn_is_persisted_and_fanned_out_in_order() -> None:
 @pytest.mark.asyncio
 async def test_steering_uses_the_existing_turn_and_is_persisted() -> None:
     runner = ControlledRunner()
-    repository = SQLiteRepository(":memory:")
+    repository = SQLModelRepository(create_sqlite_engine(":memory:"))
     service = AgentThreadService(repository, runner)
     await service.initialize()
     thread = await service.create_thread()
@@ -130,7 +135,7 @@ async def test_steering_uses_the_existing_turn_and_is_persisted() -> None:
 @pytest.mark.asyncio
 async def test_interrupt_and_one_running_turn_invariant() -> None:
     runner = ControlledRunner()
-    repository = SQLiteRepository(":memory:")
+    repository = SQLModelRepository(create_sqlite_engine(":memory:"))
     service = AgentThreadService(repository, runner)
     await service.initialize()
     thread = await service.create_thread()
@@ -148,7 +153,7 @@ async def test_interrupt_and_one_running_turn_invariant() -> None:
 
 @pytest.mark.asyncio
 async def test_tool_call_and_result_are_semantic_items() -> None:
-    repository = SQLiteRepository(":memory:")
+    repository = SQLModelRepository(create_sqlite_engine(":memory:"))
     service = AgentThreadService(repository, ToolRunner())
     await service.initialize()
     thread = await service.create_thread()

@@ -1,6 +1,5 @@
 import asyncio
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
@@ -48,11 +47,11 @@ class _RepositoryContextBuilder:
         return AgentContext(items=snapshot.items)
 
 
-@dataclass(slots=True)
 class _RunningTurn:
-    thread_id: UUID
-    control: TurnControl
-    task: asyncio.Task[None] | None = None
+    def __init__(self, thread_id: UUID, control: TurnControl) -> None:
+        self.thread_id = thread_id
+        self.control = control
+        self.task: asyncio.Task[None] | None = None
 
 
 class AgentThreadService:
@@ -104,8 +103,10 @@ class AgentThreadService:
         async with self._lock:
             await self._repository.create_turn(turn, user_item)
             self._running[turn.id] = running
-        await self._events.publish(TurnStarted(thread_id, turn.id))
-        await self._events.publish(ItemCompleted(thread_id, turn.id, user_item))
+        await self._events.publish(TurnStarted(thread_id=thread_id, turn_id=turn.id))
+        await self._events.publish(
+            ItemCompleted(thread_id=thread_id, turn_id=turn.id, item=user_item)
+        )
         running.task = asyncio.create_task(
             self._execute(turn, context, message, running),
             name=f"agent-turn-{turn.id}",
@@ -124,8 +125,10 @@ class AgentThreadService:
             content=message,
         )
         await self._repository.add_item(item)
-        await self._events.publish(ItemCompleted(thread_id, turn_id, item))
-        await running.control.send(Steer(message))
+        await self._events.publish(
+            ItemCompleted(thread_id=thread_id, turn_id=turn_id, item=item)
+        )
+        await running.control.send(Steer(message=message))
 
     async def interrupt_turn(self, thread_id: UUID, turn_id: UUID) -> None:
         running = await self._get_running(thread_id, turn_id)
@@ -169,16 +172,32 @@ class AgentThreadService:
             async for agent_event in events:
                 item = _to_item(agent_event, turn)
                 await self._repository.add_item(item)
-                await self._events.publish(ItemCompleted(turn.thread_id, turn.id, item))
+                await self._events.publish(
+                    ItemCompleted(
+                        thread_id=turn.thread_id,
+                        turn_id=turn.id,
+                        item=item,
+                    )
+                )
         except asyncio.CancelledError:
             await self._finish(turn, TurnStatus.INTERRUPTED)
-            await self._events.publish(TurnInterrupted(turn.thread_id, turn.id))
+            await self._events.publish(
+                TurnInterrupted(thread_id=turn.thread_id, turn_id=turn.id)
+            )
         except Exception as error:
             await self._finish(turn, TurnStatus.FAILED)
-            await self._events.publish(TurnFailed(turn.thread_id, turn.id, str(error)))
+            await self._events.publish(
+                TurnFailed(
+                    thread_id=turn.thread_id,
+                    turn_id=turn.id,
+                    error=str(error),
+                )
+            )
         else:
             await self._finish(turn, TurnStatus.COMPLETED)
-            await self._events.publish(TurnCompleted(turn.thread_id, turn.id))
+            await self._events.publish(
+                TurnCompleted(thread_id=turn.thread_id, turn_id=turn.id)
+            )
         finally:
             async with self._lock:
                 if self._running.get(turn.id) is running:

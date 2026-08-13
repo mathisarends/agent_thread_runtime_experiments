@@ -1,25 +1,22 @@
 import asyncio
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 from uuid import UUID
 
-from .models import Item
+from .models import Item, Schema
 
 
-@dataclass(frozen=True, slots=True)
-class AgentContext:
+class AgentContext(Schema):
     items: tuple[Item, ...]
 
 
-@dataclass(frozen=True, slots=True)
-class Steer:
+class Steer(Schema):
+    type: Literal["steer"] = "steer"
     message: str
 
 
-@dataclass(frozen=True, slots=True)
-class Interrupt:
-    pass
+class Interrupt(Schema):
+    type: Literal["interrupt"] = "interrupt"
 
 
 type ControlMessage = Steer | Interrupt
@@ -43,20 +40,20 @@ class TurnControl:
         return await self._messages.get()
 
 
-@dataclass(frozen=True, slots=True)
-class AgentMessageCreated:
+class AgentMessageCreated(Schema):
+    type: Literal["agent_message"] = "agent_message"
     content: str
 
 
-@dataclass(frozen=True, slots=True)
-class ToolCallCreated:
+class ToolCallCreated(Schema):
+    type: Literal["tool_call"] = "tool_call"
     name: str
     arguments: dict[str, Any]
     call_id: str
 
 
-@dataclass(frozen=True, slots=True)
-class ToolResultCreated:
+class ToolResultCreated(Schema):
+    type: Literal["tool_result"] = "tool_result"
     call_id: str
     output: Any
 

@@ -1,21 +1,32 @@
 import asyncio
 from collections.abc import Awaitable, Callable
-from dataclasses import asdict, is_dataclass
-from datetime import datetime
-from enum import Enum
-from typing import Any, Protocol, cast
+from typing import Any, Protocol
 from uuid import UUID
 
 from fastapi import WebSocket, WebSocketDisconnect
+from pydantic import ValidationError
 
 from .repository import (
     ThreadNotFoundError,
     TurnAlreadyRunningError,
     TurnNotFoundError,
 )
+from .rpc import (
+    EmptyParams,
+    RpcErrorData,
+    RpcFailure,
+    RpcNotification,
+    RpcRequest,
+    RpcSchema,
+    RpcSuccess,
+    StartTurnParams,
+    SteerTurnParams,
+    SubscriptionResult,
+    ThreadParams,
+    TurnParams,
+    UnsubscriptionResult,
+)
 from .service import AgentThreadService
-
-JSON = dict[str, Any]
 
 
 class Socket(Protocol):
@@ -41,7 +52,7 @@ class JsonRpcConnection:
         self._service = service
         self._send_lock = asyncio.Lock()
         self._subscriptions: dict[UUID, asyncio.Task[None]] = {}
-        self._methods: dict[str, Callable[[JSON], Awaitable[Any]]] = {
+        self._methods: dict[str, Callable[[dict[str, Any]], Awaitable[Any]]] = {
             "thread.create": self._create_thread,
             "thread.get": self._get_thread,
             "thread.subscribe": self._subscribe,
@@ -72,149 +83,96 @@ class JsonRpcConnection:
                 )
 
     async def _handle(self, raw_request: Any) -> None:
-        request_id: Any = None
+        request_id: str | int | None = None
         try:
-            request = self._validate_request(raw_request)
-            request_id = request.get("id")
-            method = self._methods.get(request["method"])
+            try:
+                request = RpcRequest.model_validate(raw_request)
+            except ValidationError as error:
+                raise JsonRpcError(-32600, "Invalid Request") from error
+            request_id = request.id
+            method = self._methods.get(request.method)
             if method is None:
                 raise JsonRpcError(-32601, "Method not found")
-            params = request.get("params", {})
-            if not isinstance(params, dict):
-                raise JsonRpcError(-32602, "Invalid params")
-            result = await method(params)
-            if "id" in request:
-                await self._send({"jsonrpc": "2.0", "id": request_id, "result": result})
+            result = await method(request.params)
+            if request.expects_response:
+                await self._send(RpcSuccess(id=request.id, result=result))
         except JsonRpcError as error:
             await self._send_error(request_id, error.code, error.message)
-        except (KeyError, TypeError, ValueError) as error:
-            await self._send_error(request_id, -32602, f"Invalid params: {error}")
+        except ValidationError as error:
+            await self._send_error(request_id, -32602, _validation_message(error))
         except (ThreadNotFoundError, TurnNotFoundError) as error:
             await self._send_error(request_id, -32004, f"Not found: {error}")
         except TurnAlreadyRunningError as error:
             await self._send_error(request_id, -32009, f"Turn already running: {error}")
+        except ValueError as error:
+            await self._send_error(request_id, -32602, f"Invalid params: {error}")
         except Exception:
             await self._send_error(request_id, -32603, "Internal error")
 
-    @staticmethod
-    def _validate_request(raw_request: Any) -> JSON:
-        if not isinstance(raw_request, dict):
-            raise JsonRpcError(-32600, "Invalid Request")
-        request = cast(JSON, raw_request)
-        if request.get("jsonrpc") != "2.0" or not isinstance(
-            request.get("method"), str
-        ):
-            raise JsonRpcError(-32600, "Invalid Request")
-        return request
+    async def _create_thread(self, raw: dict[str, Any]) -> Any:
+        EmptyParams.model_validate(raw)
+        return await self._service.create_thread()
 
-    async def _create_thread(self, params: JSON) -> Any:
-        _require_only(params)
-        return _json(await self._service.create_thread())
+    async def _get_thread(self, raw: dict[str, Any]) -> Any:
+        params = ThreadParams.model_validate(raw)
+        return await self._service.get_thread(params.thread_id)
 
-    async def _get_thread(self, params: JSON) -> Any:
-        _require_only(params, "thread_id")
-        return _json(await self._service.get_thread(_uuid(params, "thread_id")))
+    async def _start_turn(self, raw: dict[str, Any]) -> Any:
+        params = StartTurnParams.model_validate(raw)
+        return await self._service.start_turn(params.thread_id, params.message)
 
-    async def _start_turn(self, params: JSON) -> Any:
-        _require_only(params, "thread_id", "message")
-        message = params["message"]
-        if not isinstance(message, str):
-            raise TypeError("message must be a string")
-        return _json(
-            await self._service.start_turn(_uuid(params, "thread_id"), message)
-        )
+    async def _steer_turn(self, raw: dict[str, Any]) -> None:
+        params = SteerTurnParams.model_validate(raw)
+        await self._service.steer_turn(params.thread_id, params.turn_id, params.message)
 
-    async def _steer_turn(self, params: JSON) -> Any:
-        _require_only(params, "thread_id", "turn_id", "message")
-        message = params["message"]
-        if not isinstance(message, str):
-            raise TypeError("message must be a string")
-        await self._service.steer_turn(
-            _uuid(params, "thread_id"), _uuid(params, "turn_id"), message
-        )
-        return None
+    async def _interrupt_turn(self, raw: dict[str, Any]) -> None:
+        params = TurnParams.model_validate(raw)
+        await self._service.interrupt_turn(params.thread_id, params.turn_id)
 
-    async def _interrupt_turn(self, params: JSON) -> Any:
-        _require_only(params, "thread_id", "turn_id")
-        await self._service.interrupt_turn(
-            _uuid(params, "thread_id"), _uuid(params, "turn_id")
-        )
-        return None
-
-    async def _subscribe(self, params: JSON) -> Any:
-        _require_only(params, "thread_id")
-        thread_id = _uuid(params, "thread_id")
-        await self._service.get_thread(thread_id)
-        if thread_id not in self._subscriptions:
+    async def _subscribe(self, raw: dict[str, Any]) -> SubscriptionResult:
+        params = ThreadParams.model_validate(raw)
+        await self._service.get_thread(params.thread_id)
+        if params.thread_id not in self._subscriptions:
             ready = asyncio.Event()
-            self._subscriptions[thread_id] = asyncio.create_task(
-                self._forward_events(thread_id, ready),
-                name=f"socket-events-{thread_id}",
+            self._subscriptions[params.thread_id] = asyncio.create_task(
+                self._forward_events(params.thread_id, ready),
+                name=f"socket-events-{params.thread_id}",
             )
             await ready.wait()
-        return {"subscribed": str(thread_id)}
+        return SubscriptionResult(subscribed=params.thread_id)
 
-    async def _unsubscribe(self, params: JSON) -> Any:
-        _require_only(params, "thread_id")
-        thread_id = _uuid(params, "thread_id")
-        task = self._subscriptions.pop(thread_id, None)
+    async def _unsubscribe(self, raw: dict[str, Any]) -> UnsubscriptionResult:
+        params = ThreadParams.model_validate(raw)
+        task = self._subscriptions.pop(params.thread_id, None)
         if task is not None:
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
-        return {"unsubscribed": str(thread_id)}
+        return UnsubscriptionResult(unsubscribed=params.thread_id)
 
     async def _forward_events(self, thread_id: UUID, ready: asyncio.Event) -> None:
         async for event in self._service.subscribe(thread_id, _ready=ready):
-            await self._send(
-                {
-                    "jsonrpc": "2.0",
-                    "method": "thread.event",
-                    "params": _json(event),
-                }
-            )
+            await self._send(RpcNotification(method="thread.event", params=event))
 
-    async def _send_error(self, request_id: Any, code: int, message: str) -> None:
+    async def _send_error(
+        self, request_id: str | int | None, code: int, message: str
+    ) -> None:
         await self._send(
-            {
-                "jsonrpc": "2.0",
-                "id": request_id,
-                "error": {"code": code, "message": message},
-            }
+            RpcFailure(
+                id=request_id,
+                error=RpcErrorData(code=code, message=message),
+            )
         )
 
-    async def _send(self, message: JSON) -> None:
+    async def _send(self, message: RpcSchema) -> None:
         async with self._send_lock:
-            await self._socket.send_json(message)
+            await self._socket.send_json(message.model_dump(mode="json"))
 
 
 async def handle_websocket(websocket: WebSocket, service: AgentThreadService) -> None:
     await JsonRpcConnection(websocket, service).run()
 
 
-def _require_only(params: JSON, *names: str) -> None:
-    expected = set(names)
-    missing = expected - params.keys()
-    extra = params.keys() - expected
-    if missing:
-        raise KeyError(f"missing {', '.join(sorted(missing))}")
-    if extra:
-        raise KeyError(f"unexpected {', '.join(sorted(extra))}")
-
-
-def _uuid(params: JSON, name: str) -> UUID:
-    value = params[name]
-    if not isinstance(value, str):
-        raise TypeError(f"{name} must be a string UUID")
-    return UUID(value)
-
-
-def _json(value: Any) -> Any:
-    if is_dataclass(value) and not isinstance(value, type):
-        return _json(asdict(value))
-    if isinstance(value, dict):
-        return {key: _json(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_json(item) for item in value]
-    if isinstance(value, (UUID, datetime, Enum)):
-        return str(value)
-    return value
+def _validation_message(error: ValidationError) -> str:
+    issue = error.errors(include_url=False)[0]
+    location = ".".join(str(part) for part in issue["loc"])
+    return f"Invalid params at {location}: {issue['msg']}"

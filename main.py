@@ -2,26 +2,36 @@ import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 
-from gateway.conversation import AgentThreadService, FakeAgentRunner, SQLiteRepository
+from gateway.config import Settings
+from gateway.container import create_container
+from gateway.conversation.agent import AgentRunner
 from gateway.conversation.routes import create_router
+from gateway.conversation.service import AgentThreadService
 
 
 def create_app(
-    service: AgentThreadService | None = None,
+    settings: Settings | None = None,
+    runner: AgentRunner | None = None,
 ) -> FastAPI:
-    repository = SQLiteRepository(os.getenv("AGENT_THREAD_DB", "agent_threads.db"))
-    runtime = service or AgentThreadService(repository, FakeAgentRunner())
+    config = settings or Settings(
+        database_path=os.getenv("AGENT_THREAD_DB", "agent_threads.db")
+    )
+    container = create_container(config, runner)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         del app
-        await runtime.initialize()
+        service = await container.get(AgentThreadService)
+        await service.initialize()
         yield
+        await container.close()
 
     application = FastAPI(title="Agent Thread Runtime", lifespan=lifespan)
-    application.include_router(create_router(runtime))
+    application.include_router(create_router())
+    setup_dishka(container, application)
     return application
 
 
