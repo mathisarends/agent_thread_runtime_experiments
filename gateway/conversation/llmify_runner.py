@@ -31,6 +31,7 @@ from gateway.conversation.agent import (
 )
 from gateway.conversation.models import (
     AgentMessageItem,
+    ItemType,
     ToolCallItem,
     ToolResultItem,
     UserMessageItem,
@@ -86,7 +87,7 @@ class LlmifyAgentRunner:
                     if not message_started:
                         yield AgentItemStarted(
                             item_id=message_id,
-                            item_type="agent_message",
+                            item_type=ItemType.AGENT_MESSAGE,
                         )
                         message_started = True
                     content_parts.append(event.delta)
@@ -99,7 +100,7 @@ class LlmifyAgentRunner:
                     if not content_parts and event.completion:
                         yield AgentItemStarted(
                             item_id=message_id,
-                            item_type="agent_message",
+                            item_type=ItemType.AGENT_MESSAGE,
                         )
                         yield AgentMessageDelta(
                             item_id=message_id,
@@ -115,9 +116,7 @@ class LlmifyAgentRunner:
             if not calls:
                 return
 
-            messages.append(
-                AssistantMessage(content=content or None, tool_calls=calls)
-            )
+            messages.append(AssistantMessage(content=content or None, tool_calls=calls))
             for call in calls:
                 tool = next(
                     (

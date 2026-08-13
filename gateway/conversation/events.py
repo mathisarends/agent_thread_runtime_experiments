@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import suppress
+from enum import StrEnum
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -14,10 +15,21 @@ from gateway.conversation.progress import (
 )
 
 
+class ThreadEventType(StrEnum):
+    TURN_STARTED = "turn.started"
+    ITEM_STARTED = "item.started"
+    ITEM_DELTA = "item.delta"
+    ITEM_COMPLETED = "item.completed"
+    TURN_PROGRESS = "turn.progress"
+    TURN_COMPLETED = "turn.completed"
+    TURN_INTERRUPTED = "turn.interrupted"
+    TURN_FAILED = "turn.failed"
+
+
 class TurnStarted(Schema):
     thread_id: UUID
     turn_id: UUID
-    type: Literal["turn.started"] = "turn.started"
+    type: Literal[ThreadEventType.TURN_STARTED] = ThreadEventType.TURN_STARTED
 
 
 class ItemStarted(Schema):
@@ -25,7 +37,7 @@ class ItemStarted(Schema):
     turn_id: UUID
     item_id: UUID
     item_type: ItemType
-    type: Literal["item.started"] = "item.started"
+    type: Literal[ThreadEventType.ITEM_STARTED] = ThreadEventType.ITEM_STARTED
 
 
 class ItemDelta(Schema):
@@ -33,14 +45,14 @@ class ItemDelta(Schema):
     turn_id: UUID
     item_id: UUID
     delta: str
-    type: Literal["item.delta"] = "item.delta"
+    type: Literal[ThreadEventType.ITEM_DELTA] = ThreadEventType.ITEM_DELTA
 
 
 class ItemCompleted(Schema):
     thread_id: UUID
     turn_id: UUID
     item: Item
-    type: Literal["item.completed"] = "item.completed"
+    type: Literal[ThreadEventType.ITEM_COMPLETED] = ThreadEventType.ITEM_COMPLETED
 
 
 class TurnProgress(Schema):
@@ -48,26 +60,26 @@ class TurnProgress(Schema):
     turn_id: UUID
     message: ProgressMessage
     importance: ProgressImportance = ProgressImportance.NORMAL
-    type: Literal["turn.progress"] = "turn.progress"
+    type: Literal[ThreadEventType.TURN_PROGRESS] = ThreadEventType.TURN_PROGRESS
 
 
 class TurnCompleted(Schema):
     thread_id: UUID
     turn_id: UUID
-    type: Literal["turn.completed"] = "turn.completed"
+    type: Literal[ThreadEventType.TURN_COMPLETED] = ThreadEventType.TURN_COMPLETED
 
 
 class TurnInterrupted(Schema):
     thread_id: UUID
     turn_id: UUID
-    type: Literal["turn.interrupted"] = "turn.interrupted"
+    type: Literal[ThreadEventType.TURN_INTERRUPTED] = ThreadEventType.TURN_INTERRUPTED
 
 
 class TurnFailed(Schema):
     thread_id: UUID
     turn_id: UUID
     error: str
-    type: Literal["turn.failed"] = "turn.failed"
+    type: Literal[ThreadEventType.TURN_FAILED] = ThreadEventType.TURN_FAILED
 
 
 type ThreadEvent = Annotated[

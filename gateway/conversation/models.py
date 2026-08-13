@@ -5,9 +5,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-type ItemType = Literal[
-    "user_message", "agent_message", "tool_call", "tool_result"
-]
+
+class ItemType(StrEnum):
+    USER_MESSAGE = "user_message"
+    AGENT_MESSAGE = "agent_message"
+    TOOL_CALL = "tool_call"
+    TOOL_RESULT = "tool_result"
 
 
 class Schema(BaseModel):
@@ -42,24 +45,24 @@ class ItemBase(Schema):
 
 
 class UserMessageItem(ItemBase):
-    type: Literal["user_message"] = "user_message"
+    type: Literal[ItemType.USER_MESSAGE] = ItemType.USER_MESSAGE
     content: str
 
 
 class AgentMessageItem(ItemBase):
-    type: Literal["agent_message"] = "agent_message"
+    type: Literal[ItemType.AGENT_MESSAGE] = ItemType.AGENT_MESSAGE
     content: str
 
 
 class ToolCallItem(ItemBase):
-    type: Literal["tool_call"] = "tool_call"
+    type: Literal[ItemType.TOOL_CALL] = ItemType.TOOL_CALL
     name: str
     arguments: dict[str, Any]
     call_id: str
 
 
 class ToolResultItem(ItemBase):
-    type: Literal["tool_result"] = "tool_result"
+    type: Literal[ItemType.TOOL_RESULT] = ItemType.TOOL_RESULT
     call_id: str
     output: Any
 

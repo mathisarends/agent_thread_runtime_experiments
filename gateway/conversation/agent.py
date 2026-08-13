@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import AsyncIterator
+from enum import StrEnum
 from typing import Any, Literal, Protocol
 from uuid import UUID, uuid4
 
@@ -14,13 +15,18 @@ class AgentContext(Schema):
     progress_enabled: bool = False
 
 
+class ControlMessageType(StrEnum):
+    STEER = "steer"
+    INTERRUPT = "interrupt"
+
+
 class Steer(Schema):
-    type: Literal["steer"] = "steer"
+    type: Literal[ControlMessageType.STEER] = ControlMessageType.STEER
     message: str
 
 
 class Interrupt(Schema):
-    type: Literal["interrupt"] = "interrupt"
+    type: Literal[ControlMessageType.INTERRUPT] = ControlMessageType.INTERRUPT
 
 
 type ControlMessage = Steer | Interrupt
@@ -44,26 +50,37 @@ class TurnControl:
         return await self._messages.get()
 
 
+class AgentEventType(StrEnum):
+    ITEM_STARTED = "item_started"
+    AGENT_MESSAGE_DELTA = "agent_message_delta"
+    AGENT_MESSAGE = "agent_message"
+    TOOL_CALL = "tool_call"
+    TOOL_RESULT = "tool_result"
+    PROGRESS = "progress"
+
+
 class AgentItemStarted(Schema):
-    type: Literal["item_started"] = "item_started"
+    type: Literal[AgentEventType.ITEM_STARTED] = AgentEventType.ITEM_STARTED
     item_id: UUID = Field(default_factory=uuid4)
     item_type: ItemType
 
 
 class AgentMessageDelta(Schema):
-    type: Literal["agent_message_delta"] = "agent_message_delta"
+    type: Literal[AgentEventType.AGENT_MESSAGE_DELTA] = (
+        AgentEventType.AGENT_MESSAGE_DELTA
+    )
     item_id: UUID
     delta: str
 
 
 class AgentMessageCreated(Schema):
-    type: Literal["agent_message"] = "agent_message"
+    type: Literal[AgentEventType.AGENT_MESSAGE] = AgentEventType.AGENT_MESSAGE
     item_id: UUID = Field(default_factory=uuid4)
     content: str
 
 
 class ToolCallCreated(Schema):
-    type: Literal["tool_call"] = "tool_call"
+    type: Literal[AgentEventType.TOOL_CALL] = AgentEventType.TOOL_CALL
     item_id: UUID = Field(default_factory=uuid4)
     name: str
     arguments: dict[str, Any]
@@ -71,14 +88,14 @@ class ToolCallCreated(Schema):
 
 
 class ToolResultCreated(Schema):
-    type: Literal["tool_result"] = "tool_result"
+    type: Literal[AgentEventType.TOOL_RESULT] = AgentEventType.TOOL_RESULT
     item_id: UUID = Field(default_factory=uuid4)
     call_id: str
     output: Any
 
 
 class AgentProgressUpdated(Schema):
-    type: Literal["progress"] = "progress"
+    type: Literal[AgentEventType.PROGRESS] = AgentEventType.PROGRESS
     message: ProgressMessage
     importance: ProgressImportance = ProgressImportance.NORMAL
 

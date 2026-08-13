@@ -34,6 +34,7 @@ from gateway.conversation.events import (
 from gateway.conversation.models import (
     AgentMessageItem,
     Item,
+    ItemType,
     Thread,
     ThreadSnapshot,
     ToolCallItem,
@@ -223,7 +224,7 @@ class AgentThreadService:
                                 thread_id=turn.thread_id,
                                 turn_id=turn.id,
                                 item_id=agent_event.item_id,
-                                item_type="agent_message",
+                                item_type=ItemType.AGENT_MESSAGE,
                             )
                         )
                         started_items.add(agent_event.item_id)
