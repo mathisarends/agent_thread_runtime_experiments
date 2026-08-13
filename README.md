@@ -46,10 +46,15 @@ Machine-readable protocol types are available as JSON Schema at
 also registered under `components.schemas` in `GET /openapi.json` for external
 type generation. No generated client is bundled with the runtime.
 
-Run it with:
+The terminal client lives beside it as its own workspace package, `cli/`
+(see `cli/README.md`); it is an ordinary protocol consumer, not part of the
+runtime.
+
+Run the gateway with:
 
 ```powershell
-uv run python main.py
+uv run gateway
+sh scripts/run_gateway.sh
 ```
 
 Configuration is loaded from environment variables and a local `.env` file:
@@ -67,7 +72,8 @@ by Git.
 In another terminal, start the interactive client:
 
 ```powershell
-uv run python client.py
+uv run agent-cli
+sh scripts/run_cli.sh
 ```
 
 Plain text starts a turn (or steers a currently active turn). Use `/help` for all
@@ -116,7 +122,7 @@ the CLI, use `/progress proactive`, `/progress on_request`, `/progress off`, and
 For a non-interactive end-to-end smoke test:
 
 ```powershell
-uv run python client.py --message "Hello runtime"
+uv run agent-cli --message "Hello runtime"
 ```
 
 Example request sequence:
