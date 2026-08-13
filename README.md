@@ -16,6 +16,22 @@ Run it with:
 uv run python main.py
 ```
 
+In another terminal, start the interactive client:
+
+```powershell
+uv run python client.py
+```
+
+Plain text starts a turn (or steers a currently active turn). Use `/help` for all
+commands, including `/new`, `/use`, `/get`, `/start`, `/steer`, `/interrupt`, and
+the generic `/rpc` protocol escape hatch.
+
+For a non-interactive end-to-end smoke test:
+
+```powershell
+uv run python client.py --message "Hello runtime"
+```
+
 Example request sequence:
 
 ```json

@@ -1,3 +1,4 @@
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -10,7 +11,7 @@ from gateway.conversation.routes import create_router
 def create_app(
     service: AgentThreadService | None = None,
 ) -> FastAPI:
-    repository = SQLiteRepository()
+    repository = SQLiteRepository(os.getenv("AGENT_THREAD_DB", "agent_threads.db"))
     runtime = service or AgentThreadService(repository, FakeAgentRunner())
 
     @asynccontextmanager
