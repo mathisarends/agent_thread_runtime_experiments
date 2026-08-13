@@ -9,6 +9,7 @@ dependencies = []
 [dependency-groups]
 dev = [
     "agent-cli",
+    "agent-protocol",
     "gateway",
     "httpx>=0.28.1",
     "pre-commit>=4.0.0",
@@ -20,10 +21,11 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["cli", "gateway"]
+members = ["cli", "gateway", "protocol"]
 
 [tool.uv.sources]
 agent-cli = { workspace = true }
+agent-protocol = { workspace = true }
 gateway = { workspace = true }
 
 [tool.ruff]

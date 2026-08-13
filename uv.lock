@@ -9,6 +9,7 @@ resolution-markers = [
 [manifest]
 members = [
     "agent-cli",
+    "agent-protocol",
     "agent-thread-runtime-experiments",
     "gateway",
 ]
@@ -25,6 +26,17 @@ dependencies = [
 requires-dist = [{ name = "websockets", specifier = ">=15.0.1" }]
 
 [[package]]
+name = "agent-protocol"
+version = "0.1.0"
+source = { editable = "protocol" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2.11" }]
+
+[[package]]
 name = "agent-thread-runtime-experiments"
 version = "0.1.0"
 source = { virtual = "." }
@@ -32,6 +44,7 @@ source = { virtual = "." }
 [package.dev-dependencies]
 dev = [
     { name = "agent-cli" },
+    { name = "agent-protocol" },
     { name = "gateway" },
     { name = "httpx" },
     { name = "mypy" },
@@ -47,6 +60,7 @@ dev = [
 [package.metadata.requires-dev]
 dev = [
     { name = "agent-cli", editable = "cli" },
+    { name = "agent-protocol", editable = "protocol" },
     { name = "gateway", editable = "gateway" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "mypy", specifier = ">=1.14.1" },
