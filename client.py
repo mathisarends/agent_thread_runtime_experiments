@@ -88,6 +88,7 @@ class CliState:
     active_turn_id: str | None = None
     finished_turn_ids: set[str] = field(default_factory=set)
     subscribed_thread_ids: set[str] = field(default_factory=set)
+    streaming_item_ids: set[str] = field(default_factory=set)
 
 
 HELP = """Commands:
@@ -148,8 +149,9 @@ async def run_once(url: str, message: str, thread_id: str | None = None) -> None
             )
             print(f"thread: {thread_id}")
             print(f"turn:   {turn['id']}")
+            streaming_item_ids: set[str] = set()
             async for event in rpc.notifications():
-                _render_event(event)
+                _render_event(event, streaming_item_ids=streaming_item_ids)
                 if event["type"] in {
                     "turn.completed",
                     "turn.interrupted",
@@ -274,18 +276,38 @@ def _process_notification(state: CliState, event: dict[str, Any]) -> None:
         }:
             state.finished_turn_ids.add(event["turn_id"])
             state.active_turn_id = None
-    _render_event(event, thread_id=None if is_current else thread_id)
+    _render_event(
+        event,
+        thread_id=None if is_current else thread_id,
+        streaming_item_ids=state.streaming_item_ids,
+    )
 
 
-def _render_event(event: dict[str, Any], *, thread_id: str | None = None) -> None:
+def _render_event(
+    event: dict[str, Any],
+    *,
+    thread_id: str | None = None,
+    streaming_item_ids: set[str] | None = None,
+) -> None:
     prefix = f"[thread {thread_id}] " if thread_id is not None else ""
     event_type = event["type"]
-    if event_type == "item.completed":
+    streamed = streaming_item_ids if streaming_item_ids is not None else set()
+    if event_type == "item.delta":
+        if event["item_id"] not in streamed:
+            streamed.add(event["item_id"])
+            print(f"\n{prefix}agent> ", end="", flush=True)
+        print(event["delta"], end="", flush=True)
+    elif event_type == "item.completed":
         item = event["item"]
         if item["type"] == "user_message":
             print(f"\n{prefix}user> {item['content']}")
         elif item["type"] == "agent_message":
-            print(f"\n{prefix}agent> {item['content']}")
+            item_id = item.get("id")
+            if item_id in streamed:
+                streamed.discard(item_id)
+                print()
+            else:
+                print(f"\n{prefix}agent> {item['content']}")
         elif item["type"] == "tool_call":
             print(f"\n{prefix}tool> {item['name']} {json.dumps(item['arguments'])}")
         elif item["type"] == "tool_result":

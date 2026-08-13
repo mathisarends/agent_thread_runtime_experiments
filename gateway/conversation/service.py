@@ -6,7 +6,9 @@ from uuid import UUID, uuid4
 from .agent import (
     AgentContext,
     AgentEvent,
+    AgentItemStarted,
     AgentMessageCreated,
+    AgentMessageDelta,
     AgentRunner,
     ContextBuilder,
     Interrupt,
@@ -19,6 +21,8 @@ from .context import RepositoryContextBuilder
 from .events import (
     EventBroker,
     ItemCompleted,
+    ItemDelta,
+    ItemStarted,
     ThreadEvent,
     TurnCompleted,
     TurnFailed,
@@ -97,6 +101,14 @@ class AgentThreadService:
             self._running[turn.id] = running
         await self._events.publish(TurnStarted(thread_id=thread_id, turn_id=turn.id))
         await self._events.publish(
+            ItemStarted(
+                thread_id=thread_id,
+                turn_id=turn.id,
+                item_id=user_item.id,
+                item_type=user_item.type,
+            )
+        )
+        await self._events.publish(
             ItemCompleted(thread_id=thread_id, turn_id=turn.id, item=user_item)
         )
         running.task = asyncio.create_task(
@@ -115,6 +127,14 @@ class AgentThreadService:
             turn_id=turn_id,
             created_at=_now(),
             content=message,
+        )
+        await self._events.publish(
+            ItemStarted(
+                thread_id=thread_id,
+                turn_id=turn_id,
+                item_id=item.id,
+                item_type=item.type,
+            )
         )
         await self._repository.add_item(item)
         await self._events.publish(
@@ -159,10 +179,53 @@ class AgentThreadService:
         message: str,
         running: _RunningTurn,
     ) -> None:
+        started_items: set[UUID] = set()
         try:
             events = self._runner.run(context, message, running.control)
             async for agent_event in events:
+                if isinstance(agent_event, AgentItemStarted):
+                    if agent_event.item_id not in started_items:
+                        await self._events.publish(
+                            ItemStarted(
+                                thread_id=turn.thread_id,
+                                turn_id=turn.id,
+                                item_id=agent_event.item_id,
+                                item_type=agent_event.item_type,
+                            )
+                        )
+                        started_items.add(agent_event.item_id)
+                    continue
+                if isinstance(agent_event, AgentMessageDelta):
+                    if agent_event.item_id not in started_items:
+                        await self._events.publish(
+                            ItemStarted(
+                                thread_id=turn.thread_id,
+                                turn_id=turn.id,
+                                item_id=agent_event.item_id,
+                                item_type="agent_message",
+                            )
+                        )
+                        started_items.add(agent_event.item_id)
+                    await self._events.publish(
+                        ItemDelta(
+                            thread_id=turn.thread_id,
+                            turn_id=turn.id,
+                            item_id=agent_event.item_id,
+                            delta=agent_event.delta,
+                        )
+                    )
+                    continue
                 item = _to_item(agent_event, turn)
+                if item.id not in started_items:
+                    await self._events.publish(
+                        ItemStarted(
+                            thread_id=turn.thread_id,
+                            turn_id=turn.id,
+                            item_id=item.id,
+                            item_type=item.type,
+                        )
+                    )
+                    started_items.add(item.id)
                 await self._repository.add_item(item)
                 await self._events.publish(
                     ItemCompleted(
@@ -200,11 +263,10 @@ class AgentThreadService:
 
 
 def _to_item(event: AgentEvent, turn: Turn) -> Item:
-    item_id = uuid4()
     created_at = _now()
     if isinstance(event, AgentMessageCreated):
         return AgentMessageItem(
-            id=item_id,
+            id=event.item_id,
             thread_id=turn.thread_id,
             turn_id=turn.id,
             created_at=created_at,
@@ -212,7 +274,7 @@ def _to_item(event: AgentEvent, turn: Turn) -> Item:
         )
     if isinstance(event, ToolCallCreated):
         return ToolCallItem(
-            id=item_id,
+            id=event.item_id,
             thread_id=turn.thread_id,
             turn_id=turn.id,
             created_at=created_at,
@@ -222,7 +284,7 @@ def _to_item(event: AgentEvent, turn: Turn) -> Item:
         )
     if isinstance(event, ToolResultCreated):
         return ToolResultItem(
-            id=item_id,
+            id=event.item_id,
             thread_id=turn.thread_id,
             turn_id=turn.id,
             created_at=created_at,

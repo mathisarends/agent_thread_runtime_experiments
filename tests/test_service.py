@@ -82,8 +82,8 @@ async def test_turn_is_persisted_and_fanned_out_in_order() -> None:
     await service.initialize()
     thread = await service.create_thread()
 
-    first = asyncio.create_task(collect_events(service, thread.id, 4))
-    second = asyncio.create_task(collect_events(service, thread.id, 4))
+    first = asyncio.create_task(collect_events(service, thread.id, 6))
+    second = asyncio.create_task(collect_events(service, thread.id, 6))
     await asyncio.sleep(0)
 
     turn = await service.start_turn(thread.id, "hello")
@@ -92,12 +92,16 @@ async def test_turn_is_persisted_and_fanned_out_in_order() -> None:
 
     expected = [
         "turn.started",
+        "item.started",
         "item.completed",
+        "item.started",
         "item.completed",
         "turn.completed",
     ]
     assert [event.type for event in first_events] == expected
     assert [event.type for event in second_events] == expected
+    assert first_events[1].item_id == first_events[2].item.id
+    assert first_events[3].item_id == first_events[4].item.id
 
     snapshot = await service.get_thread(thread.id)
     assert snapshot.turns[0].status is TurnStatus.COMPLETED

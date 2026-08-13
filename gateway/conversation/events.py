@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from .models import Item, Schema
+from .models import Item, ItemType, Schema
 
 
 class TurnStarted(Schema):
@@ -19,7 +19,7 @@ class ItemStarted(Schema):
     thread_id: UUID
     turn_id: UUID
     item_id: UUID
-    item_type: str
+    item_type: ItemType
     type: Literal["item.started"] = "item.started"
 
 

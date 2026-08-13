@@ -32,7 +32,7 @@ def test_json_rpc_commands_and_events_share_one_websocket() -> None:
                     "params": {"thread_id": thread_id, "message": "hello"},
                 }
             )
-            messages = [socket.receive_json() for _ in range(5)]
+            messages = [socket.receive_json() for _ in range(7)]
 
     response = next(message for message in messages if message.get("id") == 3)
     notifications = [
@@ -41,7 +41,9 @@ def test_json_rpc_commands_and_events_share_one_websocket() -> None:
     assert response["result"]["status"] == "running"
     assert [message["params"]["type"] for message in notifications] == [
         "turn.started",
+        "item.started",
         "item.completed",
+        "item.started",
         "item.completed",
         "turn.completed",
     ]

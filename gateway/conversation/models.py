@@ -5,6 +5,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+type ItemType = Literal[
+    "user_message", "agent_message", "tool_call", "tool_result"
+]
+
 
 class Schema(BaseModel):
     model_config = ConfigDict(frozen=True)

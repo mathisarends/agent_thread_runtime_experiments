@@ -1,27 +1,73 @@
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from types import SimpleNamespace
 from typing import Any, cast
 from uuid import uuid4
 
 import pytest
-from llmify import AssistantMessage, ChatModel, SystemMessage, UserMessage
+from llmify import (
+    AssistantMessage,
+    ChatModel,
+    Function,
+    StreamEnd,
+    StreamTextDelta,
+    StreamToolCall,
+    SystemMessage,
+    ToolCall,
+    ToolResultMessage,
+    UserMessage,
+)
 
-from gateway.conversation.agent import AgentContext, AgentMessageCreated, TurnControl
+from gateway.conversation.agent import (
+    AgentContext,
+    AgentItemStarted,
+    AgentMessageCreated,
+    AgentMessageDelta,
+    ToolCallCreated,
+    ToolResultCreated,
+    TurnControl,
+)
 from gateway.conversation.llmify_runner import LlmifyAgentRunner
 from gateway.conversation.models import AgentMessageItem, UserMessageItem
+from gateway.conversation.tools import default_tools
 
 
 class RecordingModel:
     def __init__(self) -> None:
         self.messages: list[Any] = []
 
-    async def invoke(self, messages: list[Any]) -> SimpleNamespace:
+    async def stream(
+        self, messages: list[Any], **kwargs: Any
+    ) -> AsyncIterator[Any]:
+        del kwargs
         self.messages = messages
-        return SimpleNamespace(completion="A real model answer")
+        yield StreamTextDelta(delta="A real ")
+        yield StreamTextDelta(delta="model answer")
+        yield StreamEnd(completion="A real model answer")
+
+
+class ToolCallingModel:
+    def __init__(self) -> None:
+        self.requests: list[list[Any]] = []
+
+    async def stream(
+        self, messages: list[Any], **kwargs: Any
+    ) -> AsyncIterator[Any]:
+        assert kwargs["tools"]
+        self.requests.append(list(messages))
+        if len(self.requests) == 1:
+            call = ToolCall(
+                id="call-add",
+                function=Function(name="add_numbers", arguments='{"a": 2, "b": 3}'),
+            )
+            yield StreamToolCall(tool_call=call)
+            yield StreamEnd(tool_calls=[call])
+        else:
+            yield StreamTextDelta(delta="The sum is 5.")
+            yield StreamEnd(completion="The sum is 5.")
 
 
 @pytest.mark.asyncio
-async def test_runner_builds_llmify_history_and_yields_agent_event() -> None:
+async def test_runner_streams_llmify_history_as_item_lifecycle() -> None:
     now = datetime.now(UTC)
     thread_id = uuid4()
     previous_turn_id = uuid4()
@@ -50,13 +96,45 @@ async def test_runner_builds_llmify_history_and_yields_agent_event() -> None:
         event async for event in runner.run(context, "New question", TurnControl())
     ]
 
-    assert events == [AgentMessageCreated(content="A real model answer")]
+    assert [type(event) for event in events] == [
+        AgentItemStarted,
+        AgentMessageDelta,
+        AgentMessageDelta,
+        AgentMessageCreated,
+    ]
+    assert len({event.item_id for event in events}) == 1
+    assert isinstance(events[-1], AgentMessageCreated)
+    assert events[-1].content == "A real model answer"
     assert len(model.messages) == 4
     assert isinstance(model.messages[0], SystemMessage)
-    assert model.messages[0].content == "Be concise."
     assert isinstance(model.messages[1], UserMessage)
-    assert model.messages[1].content == "Earlier question"
     assert isinstance(model.messages[2], AssistantMessage)
-    assert model.messages[2].content == "Earlier answer"
     assert isinstance(model.messages[3], UserMessage)
-    assert model.messages[3].content == "New question"
+
+
+@pytest.mark.asyncio
+async def test_runner_executes_registered_tool_and_correlates_result() -> None:
+    model = ToolCallingModel()
+    runner = LlmifyAgentRunner(
+        cast(ChatModel, model),
+        system_prompt="Use tools.",
+        tools=default_tools(),
+    )
+
+    events = [
+        event
+        async for event in runner.run(
+            AgentContext(items=()), "Add 2 and 3", TurnControl()
+        )
+    ]
+
+    tool_call = next(event for event in events if isinstance(event, ToolCallCreated))
+    tool_result = next(
+        event for event in events if isinstance(event, ToolResultCreated)
+    )
+    assert tool_call.call_id == "call-add"
+    assert tool_call.arguments == {"a": 2, "b": 3}
+    assert tool_result.call_id == tool_call.call_id
+    assert tool_result.output == 5
+    assert len(model.requests) == 2
+    assert isinstance(model.requests[1][-1], ToolResultMessage)

@@ -14,6 +14,7 @@ from .conversation.events import EventBroker
 from .conversation.llmify_runner import LlmifyAgentRunner
 from .conversation.repository import Repository, SQLModelRepository
 from .conversation.service import AgentThreadService
+from .conversation.tools import default_tools
 
 
 class ConversationProvider(Provider):
@@ -69,7 +70,11 @@ class LlmifyAgentProvider(Provider):
 
     @provide(scope=Scope.APP)
     def runner(self, model: ChatModel, settings: Settings) -> AgentRunner:
-        return LlmifyAgentRunner(model, settings.agent_system_prompt)
+        return LlmifyAgentRunner(
+            model,
+            settings.agent_system_prompt,
+            tools=default_tools(),
+        )
 
 
 class RunnerOverrideProvider(Provider):

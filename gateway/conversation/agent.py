@@ -1,9 +1,11 @@
 import asyncio
 from collections.abc import AsyncIterator
 from typing import Any, Literal, Protocol
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from .models import Item, Schema
+from pydantic import Field
+
+from .models import Item, ItemType, Schema
 
 
 class AgentContext(Schema):
@@ -40,13 +42,27 @@ class TurnControl:
         return await self._messages.get()
 
 
+class AgentItemStarted(Schema):
+    type: Literal["item_started"] = "item_started"
+    item_id: UUID = Field(default_factory=uuid4)
+    item_type: ItemType
+
+
+class AgentMessageDelta(Schema):
+    type: Literal["agent_message_delta"] = "agent_message_delta"
+    item_id: UUID
+    delta: str
+
+
 class AgentMessageCreated(Schema):
     type: Literal["agent_message"] = "agent_message"
+    item_id: UUID = Field(default_factory=uuid4)
     content: str
 
 
 class ToolCallCreated(Schema):
     type: Literal["tool_call"] = "tool_call"
+    item_id: UUID = Field(default_factory=uuid4)
     name: str
     arguments: dict[str, Any]
     call_id: str
@@ -54,11 +70,18 @@ class ToolCallCreated(Schema):
 
 class ToolResultCreated(Schema):
     type: Literal["tool_result"] = "tool_result"
+    item_id: UUID = Field(default_factory=uuid4)
     call_id: str
     output: Any
 
 
-type AgentEvent = AgentMessageCreated | ToolCallCreated | ToolResultCreated
+type AgentEvent = (
+    AgentItemStarted
+    | AgentMessageDelta
+    | AgentMessageCreated
+    | ToolCallCreated
+    | ToolResultCreated
+)
 
 
 class AgentRunner(Protocol):

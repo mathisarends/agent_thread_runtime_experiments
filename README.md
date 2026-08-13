@@ -65,6 +65,17 @@ the generic `/rpc` protocol escape hatch.
 history; use `/use THREAD_ID` followed by `/get` to inspect persisted history.
 Events from subscribed background threads are prefixed with their thread ID.
 
+Every item uses the same lifecycle on the WebSocket:
+
+```text
+item.started → item.delta* → item.completed
+```
+
+Agent text is emitted as live `item.delta` chunks and rendered incrementally by
+the CLI. Tool calls use the same lifecycle and correlate `tool_call` with
+`tool_result` through a stable `call_id`. The default llmify runner registers a
+minimal `add_numbers(a, b)` tool as an end-to-end tool-loop example.
+
 For a non-interactive end-to-end smoke test:
 
 ```powershell

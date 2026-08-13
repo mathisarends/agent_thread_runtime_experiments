@@ -7,6 +7,7 @@ from .llmify_runner import LlmifyAgentRunner
 from .models import Thread, ThreadSnapshot, Turn, TurnStatus
 from .repository import SQLModelRepository
 from .service import AgentThreadService
+from .tools import add_numbers
 
 __all__ = [
     "AgentRunner",
@@ -21,5 +22,6 @@ __all__ = [
     "Turn",
     "TurnControl",
     "TurnStatus",
+    "add_numbers",
     "create_sqlite_engine",
 ]
