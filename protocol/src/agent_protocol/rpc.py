@@ -34,11 +34,15 @@ class RpcErrorCode(IntEnum):
     TURN_ALREADY_RUNNING = -32009
 
 
-class EmptyParams(Schema):
+class RpcSchema(Schema):
+    """Base class for all JSON-RPC wire objects."""
+
+
+class EmptyParams(RpcSchema):
     pass
 
 
-class ThreadParams(Schema):
+class ThreadParams(RpcSchema):
     thread_id: UUID
 
 
@@ -58,7 +62,7 @@ class SteerTurnParams(TurnParams):
     message: str = Field(min_length=1)
 
 
-class RpcRequest(Schema):
+class RpcRequest(RpcSchema):
     jsonrpc: Literal["2.0"]
     id: str | int | None = None
 
@@ -124,12 +128,12 @@ CONVERSATION_REQUEST_ADAPTER: TypeAdapter[ConversationRequest] = TypeAdapter(
 )
 
 
-class SubscriptionResult(Schema):
+class SubscriptionResult(RpcSchema):
     subscribed: UUID
     progress: ProgressMode
 
 
-class UnsubscriptionResult(Schema):
+class UnsubscriptionResult(RpcSchema):
     unsubscribed: UUID
 
 
@@ -144,24 +148,24 @@ type RpcResult = (
 )
 
 
-class RpcErrorData(Schema):
+class RpcErrorData(RpcSchema):
     code: RpcErrorCode
     message: str
 
 
-class RpcSuccess(Schema):
+class RpcSuccess(RpcSchema):
     jsonrpc: Literal["2.0"] = "2.0"
     id: str | int | None
     result: RpcResult
 
 
-class RpcFailure(Schema):
+class RpcFailure(RpcSchema):
     jsonrpc: Literal["2.0"] = "2.0"
     id: str | int | None
     error: RpcErrorData
 
 
-class RpcNotification(Schema):
+class RpcNotification(RpcSchema):
     jsonrpc: Literal["2.0"] = "2.0"
     method: Literal[RpcNotificationMethod.THREAD_EVENT] = (
         RpcNotificationMethod.THREAD_EVENT
@@ -172,7 +176,7 @@ class RpcNotification(Schema):
 type ConversationServerMessage = RpcSuccess | RpcFailure | RpcNotification
 
 
-class ConversationProtocol(Schema):
+class ConversationProtocol(RpcSchema):
     client_message: ConversationRequest
     server_message: ConversationServerMessage
 

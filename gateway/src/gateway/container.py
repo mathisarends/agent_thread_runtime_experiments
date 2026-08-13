@@ -11,7 +11,7 @@ from gateway.conversation.agents.context import RepositoryContextBuilder
 from gateway.conversation.agents.contracts import AgentRunner, ContextBuilder
 from gateway.conversation.agents.llmify import LlmifyAgentRunner
 from gateway.conversation.agents.tools import default_tools
-from gateway.conversation.core.events import EventBroker
+from gateway.conversation.core.broker import EventBroker
 from gateway.conversation.core.service import AgentThreadService
 from gateway.conversation.persistence.database import create_sqlite_engine
 from gateway.conversation.persistence.repository import Repository

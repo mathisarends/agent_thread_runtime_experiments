@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest_asyncio
-from gateway.conversation.core.models import Thread
+from agent_protocol.models import Thread
 from gateway.conversation.persistence.database import create_sqlite_engine
 from gateway.conversation.persistence.sqlmodel import SQLModelRepository
 

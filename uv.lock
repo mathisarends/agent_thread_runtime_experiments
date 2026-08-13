@@ -330,6 +330,7 @@ name = "gateway"
 version = "0.1.0"
 source = { editable = "gateway" }
 dependencies = [
+    { name = "agent-protocol" },
     { name = "dishka" },
     { name = "fastapi" },
     { name = "py-llmify", extra = ["openai"] },
@@ -341,6 +342,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "agent-protocol", editable = "protocol" },
     { name = "dishka", specifier = ">=1.6" },
     { name = "fastapi", specifier = ">=0.116.1" },
     { name = "py-llmify", extras = ["openai"], specifier = ">=0.10.0" },

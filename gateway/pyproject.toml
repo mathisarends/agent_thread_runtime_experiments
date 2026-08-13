@@ -5,6 +5,7 @@ description = "Transport-independent agent thread runtime gateway"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "agent-protocol",
     "dishka>=1.6",
     "fastapi>=0.116.1",
     "py-llmify[openai]>=0.10.0",

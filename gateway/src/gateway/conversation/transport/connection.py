@@ -1,5 +1,14 @@
 import asyncio
 
+from agent_protocol.rpc import (
+    CONVERSATION_REQUEST_ADAPTER,
+    ConversationRequest,
+    RpcErrorCode,
+    RpcErrorData,
+    RpcFailure,
+    RpcSchema,
+    RpcSuccess,
+)
 from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
@@ -10,15 +19,6 @@ from gateway.conversation.persistence.repository import (
     TurnNotFoundError,
 )
 from gateway.conversation.transport.methods import ConversationRpcMethods
-from gateway.conversation.transport.schemas import (
-    CONVERSATION_REQUEST_ADAPTER,
-    ConversationRequest,
-    RpcErrorCode,
-    RpcErrorData,
-    RpcFailure,
-    RpcSchema,
-    RpcSuccess,
-)
 
 
 class JsonRpcError(Exception):

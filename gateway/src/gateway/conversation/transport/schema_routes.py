@@ -1,14 +1,13 @@
 from typing import Any
 
-from fastapi import APIRouter, FastAPI
-from fastapi.responses import JSONResponse
-from pydantic import TypeAdapter
-
-from gateway.conversation.transport.schemas import (
+from agent_protocol.rpc import (
     CONVERSATION_PROTOCOL_ADAPTER,
     CONVERSATION_REQUEST_ADAPTER,
     CONVERSATION_SERVER_MESSAGE_ADAPTER,
 )
+from fastapi import APIRouter, FastAPI
+from fastapi.responses import JSONResponse
+from pydantic import TypeAdapter
 
 schema_router = APIRouter(tags=["conversation schema"])
 

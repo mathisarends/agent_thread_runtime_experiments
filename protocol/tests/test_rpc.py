@@ -1,5 +1,5 @@
 import pytest
-from gateway.conversation.transport.schemas import (
+from agent_protocol.rpc import (
     CONVERSATION_REQUEST_ADAPTER,
     CreateThreadRequest,
     GetThreadRequest,

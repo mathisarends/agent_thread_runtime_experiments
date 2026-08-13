@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from uuid import UUID
 
-from gateway.conversation.core.models import (
+from agent_protocol.models import (
     Item,
     Thread,
     ThreadSnapshot,

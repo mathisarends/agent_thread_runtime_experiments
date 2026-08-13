@@ -2,12 +2,7 @@ import asyncio
 from datetime import UTC, datetime
 from uuid import UUID
 
-from pydantic import TypeAdapter
-from sqlalchemy.engine import Engine
-from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session, SQLModel, col, select
-
-from gateway.conversation.core.models import (
+from agent_protocol.models import (
     Item,
     Thread,
     ThreadSnapshot,
@@ -15,6 +10,11 @@ from gateway.conversation.core.models import (
     TurnStatus,
     UserMessageItem,
 )
+from pydantic import TypeAdapter
+from sqlalchemy.engine import Engine
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import Session, SQLModel, col, select
+
 from gateway.conversation.persistence.database import ItemRow, ThreadRow, TurnRow
 from gateway.conversation.persistence.repository import (
     Repository,

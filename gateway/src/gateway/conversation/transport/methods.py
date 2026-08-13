@@ -3,9 +3,8 @@ from collections.abc import Awaitable, Callable
 from typing import assert_never
 from uuid import UUID
 
-from gateway.conversation.core.progress import ProgressMode
-from gateway.conversation.core.service import AgentThreadService
-from gateway.conversation.transport.schemas import (
+from agent_protocol.progress import ProgressMode
+from agent_protocol.rpc import (
     ConversationRequest,
     CreateThreadRequest,
     GetThreadRequest,
@@ -21,6 +20,8 @@ from gateway.conversation.transport.schemas import (
     UnsubscribeThreadRequest,
     UnsubscriptionResult,
 )
+
+from gateway.conversation.core.service import AgentThreadService
 
 SendMessage = Callable[[RpcSchema], Awaitable[None]]
 

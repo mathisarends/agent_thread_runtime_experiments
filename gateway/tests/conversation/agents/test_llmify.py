@@ -4,6 +4,12 @@ from typing import Any, cast
 from uuid import uuid4
 
 import pytest
+from agent_protocol.models import (
+    AgentMessageItem,
+    ToolCallItem,
+    ToolResultItem,
+    UserMessageItem,
+)
 from gateway.conversation.agents.contracts import (
     AgentContext,
     AgentItemStarted,
@@ -16,12 +22,6 @@ from gateway.conversation.agents.contracts import (
 )
 from gateway.conversation.agents.llmify import LlmifyAgentRunner, report_progress
 from gateway.conversation.agents.tools import default_tools
-from gateway.conversation.core.models import (
-    AgentMessageItem,
-    ToolCallItem,
-    ToolResultItem,
-    UserMessageItem,
-)
 from llmify import (
     AssistantMessage,
     ChatModel,

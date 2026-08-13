@@ -3,6 +3,20 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from uuid import UUID, uuid4
 
 import pytest
+from agent_protocol.events import (
+    ItemCompleted,
+    ItemDelta,
+    ItemStarted,
+    ThreadEvent,
+    TurnFailed,
+)
+from agent_protocol.models import (
+    AgentMessageItem,
+    ItemType,
+    TurnStatus,
+    UserMessageItem,
+)
+from agent_protocol.progress import ProgressMode
 from gateway.conversation.agents.contracts import (
     AgentContext,
     AgentEvent,
@@ -17,20 +31,6 @@ from gateway.conversation.agents.contracts import (
     ToolResultCreated,
     TurnControl,
 )
-from gateway.conversation.core.events import (
-    ItemCompleted,
-    ItemDelta,
-    ItemStarted,
-    ThreadEvent,
-    TurnFailed,
-)
-from gateway.conversation.core.models import (
-    AgentMessageItem,
-    ItemType,
-    TurnStatus,
-    UserMessageItem,
-)
-from gateway.conversation.core.progress import ProgressMode
 from gateway.conversation.core.service import AgentThreadService
 from gateway.conversation.persistence.repository import (
     TurnAlreadyRunningError,

@@ -4,10 +4,9 @@ from enum import StrEnum
 from typing import Any, Literal, Protocol
 from uuid import UUID, uuid4
 
+from agent_protocol.models import Item, ItemType, Schema
+from agent_protocol.progress import ProgressImportance, ProgressMessage
 from pydantic import Field
-
-from gateway.conversation.core.models import Item, ItemType, Schema
-from gateway.conversation.core.progress import ProgressImportance, ProgressMessage
 
 
 class AgentContext(Schema):

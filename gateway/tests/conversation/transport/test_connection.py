@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator, Callable
 
+from agent_protocol.rpc import RpcErrorCode
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from gateway.conversation.agents.contracts import (
@@ -9,7 +10,6 @@ from gateway.conversation.agents.contracts import (
     TurnControl,
 )
 from gateway.conversation.transport.connection import _rpc_error
-from gateway.conversation.transport.schemas import RpcErrorCode
 
 AppFactory = Callable[[AgentRunner], FastAPI]
 

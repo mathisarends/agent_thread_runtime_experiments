@@ -2,8 +2,8 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
+from agent_protocol.models import Thread, Turn, TurnStatus, UserMessageItem
 from gateway.conversation.agents.context import RepositoryContextBuilder
-from gateway.conversation.core.models import Thread, Turn, TurnStatus, UserMessageItem
 from gateway.conversation.persistence.database import create_sqlite_engine
 from gateway.conversation.persistence.sqlmodel import SQLModelRepository
 

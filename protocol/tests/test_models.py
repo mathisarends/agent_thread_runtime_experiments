@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
-from gateway.conversation.core.models import (
+from agent_protocol.models import (
     Item,
     Thread,
     ThreadSnapshot,

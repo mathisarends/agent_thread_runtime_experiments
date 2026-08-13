@@ -4,7 +4,7 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
-from gateway.conversation.core.models import (
+from agent_protocol.models import (
     AgentMessageItem,
     Thread,
     Turn,

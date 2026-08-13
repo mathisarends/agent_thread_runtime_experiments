@@ -4,14 +4,9 @@ from uuid import UUID
 
 import pytest
 import pytest_asyncio
-from gateway.conversation.agents.contracts import FakeAgentRunner
-from gateway.conversation.core.models import Thread, ThreadSnapshot
-from gateway.conversation.core.progress import ProgressMode
-from gateway.conversation.core.service import AgentThreadService
-from gateway.conversation.persistence.database import create_sqlite_engine
-from gateway.conversation.persistence.sqlmodel import SQLModelRepository
-from gateway.conversation.transport.methods import ConversationRpcMethods, SendMessage
-from gateway.conversation.transport.schemas import (
+from agent_protocol.models import Thread, ThreadSnapshot
+from agent_protocol.progress import ProgressMode
+from agent_protocol.rpc import (
     CreateThreadRequest,
     EmptyParams,
     GetThreadRequest,
@@ -24,6 +19,11 @@ from gateway.conversation.transport.schemas import (
     UnsubscribeThreadRequest,
     UnsubscriptionResult,
 )
+from gateway.conversation.agents.contracts import FakeAgentRunner
+from gateway.conversation.core.service import AgentThreadService
+from gateway.conversation.persistence.database import create_sqlite_engine
+from gateway.conversation.persistence.sqlmodel import SQLModelRepository
+from gateway.conversation.transport.methods import ConversationRpcMethods, SendMessage
 
 
 async def _noop_send(message: RpcSchema) -> None:

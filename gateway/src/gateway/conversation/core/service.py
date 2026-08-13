@@ -3,6 +3,31 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+from agent_protocol.events import (
+    ItemCompleted,
+    ItemDelta,
+    ItemStarted,
+    ThreadEvent,
+    TurnCompleted,
+    TurnFailed,
+    TurnInterrupted,
+    TurnProgress,
+    TurnStarted,
+)
+from agent_protocol.models import (
+    AgentMessageItem,
+    Item,
+    ItemType,
+    Thread,
+    ThreadSnapshot,
+    ToolCallItem,
+    ToolResultItem,
+    Turn,
+    TurnStatus,
+    UserMessageItem,
+)
+from agent_protocol.progress import ProgressMode, ProgressResult, ProgressSnapshot
+
 from gateway.conversation.agents.context import RepositoryContextBuilder
 from gateway.conversation.agents.contracts import (
     AgentContext,
@@ -19,35 +44,7 @@ from gateway.conversation.agents.contracts import (
     ToolResultCreated,
     TurnControl,
 )
-from gateway.conversation.core.events import (
-    EventBroker,
-    ItemCompleted,
-    ItemDelta,
-    ItemStarted,
-    ThreadEvent,
-    TurnCompleted,
-    TurnFailed,
-    TurnInterrupted,
-    TurnProgress,
-    TurnStarted,
-)
-from gateway.conversation.core.models import (
-    AgentMessageItem,
-    Item,
-    ItemType,
-    Thread,
-    ThreadSnapshot,
-    ToolCallItem,
-    ToolResultItem,
-    Turn,
-    TurnStatus,
-    UserMessageItem,
-)
-from gateway.conversation.core.progress import (
-    ProgressMode,
-    ProgressResult,
-    ProgressSnapshot,
-)
+from gateway.conversation.core.broker import EventBroker
 from gateway.conversation.persistence.repository import Repository, TurnNotFoundError
 
 

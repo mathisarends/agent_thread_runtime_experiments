@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from gateway.conversation.core.progress import (
+from agent_protocol.progress import (
     ProgressImportance,
     ProgressMode,
     ProgressResult,

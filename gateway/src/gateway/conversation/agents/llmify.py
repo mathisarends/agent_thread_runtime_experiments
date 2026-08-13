@@ -4,6 +4,13 @@ from collections.abc import AsyncIterator
 from typing import Any
 from uuid import uuid4
 
+from agent_protocol.models import (
+    AgentMessageItem,
+    ItemType,
+    ToolCallItem,
+    ToolResultItem,
+    UserMessageItem,
+)
 from llmify import (
     AssistantMessage,
     ChatModel,
@@ -28,13 +35,6 @@ from gateway.conversation.agents.contracts import (
     ToolCallCreated,
     ToolResultCreated,
     TurnControl,
-)
-from gateway.conversation.core.models import (
-    AgentMessageItem,
-    ItemType,
-    ToolCallItem,
-    ToolResultItem,
-    UserMessageItem,
 )
 
 _MAX_TOOL_ROUNDS = 8

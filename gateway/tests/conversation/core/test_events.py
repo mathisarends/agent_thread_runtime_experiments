@@ -2,13 +2,9 @@ import asyncio
 from uuid import UUID, uuid4
 
 import pytest
-from gateway.conversation.core.events import (
-    EventBroker,
-    ThreadEvent,
-    TurnProgress,
-    TurnStarted,
-)
-from gateway.conversation.core.progress import ProgressMode
+from agent_protocol.events import ThreadEvent, TurnProgress, TurnStarted
+from agent_protocol.progress import ProgressMode
+from gateway.conversation.core.broker import EventBroker
 
 
 async def _first(
