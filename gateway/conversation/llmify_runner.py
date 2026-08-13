@@ -24,6 +24,7 @@ from gateway.conversation.agent import (
     AgentItemStarted,
     AgentMessageCreated,
     AgentMessageDelta,
+    AgentProgressUpdated,
     ToolCallCreated,
     ToolResultCreated,
     TurnControl,
@@ -36,6 +37,15 @@ from gateway.conversation.models import (
 )
 
 _MAX_TOOL_ROUNDS = 8
+_PROGRESS_TOOL_NAME = "report_progress"
+
+
+def report_progress(message: str) -> str:
+    """Report one concise, user-facing progress update for a long-running task."""
+    compact = " ".join(message.split())
+    if len(compact) <= 240:
+        return compact
+    return compact[:237].rstrip() + "..."
 
 
 class LlmifyAgentRunner:
@@ -61,6 +71,9 @@ class LlmifyAgentRunner:
         del control
         messages = self._build_messages(context)
         messages.append(UserMessage(content=input))
+        tools = list(self._tools)
+        if context.progress_enabled:
+            tools.append(FunctionTool(report_progress))
 
         for _ in range(_MAX_TOOL_ROUNDS):
             message_id = uuid4()
@@ -68,7 +81,7 @@ class LlmifyAgentRunner:
             content_parts: list[str] = []
             tool_calls: dict[str, ToolCall] = {}
 
-            async for event in self._model.stream(messages, tools=list(self._tools)):
+            async for event in self._model.stream(messages, tools=tools):
                 if isinstance(event, StreamTextDelta):
                     if not message_started:
                         yield AgentItemStarted(
@@ -106,19 +119,29 @@ class LlmifyAgentRunner:
                 AssistantMessage(content=content or None, tool_calls=calls)
             )
             for call in calls:
-                tool = self._tools_by_name.get(call.function.name)
+                tool = next(
+                    (
+                        candidate
+                        for candidate in tools
+                        if candidate.name == call.function.name
+                    ),
+                    None,
+                )
                 if tool is None:
                     raise ValueError(f"unknown tool: {call.function.name}")
                 arguments = tool.parse_arguments(call.function.arguments)
-                yield ToolCallCreated(
-                    name=call.function.name,
-                    arguments=arguments,
-                    call_id=call.id,
-                )
                 result = tool(**arguments)
                 if inspect.isawaitable(result):
                     result = await result
-                yield ToolResultCreated(call_id=call.id, output=result)
+                if call.function.name == _PROGRESS_TOOL_NAME:
+                    yield AgentProgressUpdated(message=str(result))
+                else:
+                    yield ToolCallCreated(
+                        name=call.function.name,
+                        arguments=arguments,
+                        call_id=call.id,
+                    )
+                    yield ToolResultCreated(call_id=call.id, output=result)
                 messages.append(
                     ToolResultMessage(
                         tool_call_id=call.id,
@@ -129,7 +152,15 @@ class LlmifyAgentRunner:
         raise RuntimeError("maximum tool rounds exceeded")
 
     def _build_messages(self, context: AgentContext) -> list[Any]:
-        messages: list[Any] = [SystemMessage(content=self._system_prompt)]
+        system_prompt = self._system_prompt
+        if context.progress_enabled:
+            system_prompt += (
+                "\nFor longer work, call report_progress occasionally with a short, "
+                "user-facing status update. Report only meaningful phase changes, "
+                "important intermediate findings, or strategy changes; do not report "
+                "every tool call."
+            )
+        messages: list[Any] = [SystemMessage(content=system_prompt)]
         for item in context.items:
             if isinstance(item, UserMessageItem):
                 messages.append(UserMessage(content=item.content))

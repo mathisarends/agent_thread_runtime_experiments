@@ -9,6 +9,7 @@ from gateway.conversation.agent import (
     AgentItemStarted,
     AgentMessageCreated,
     AgentMessageDelta,
+    AgentProgressUpdated,
     AgentRunner,
     ContextBuilder,
     Interrupt,
@@ -27,6 +28,7 @@ from gateway.conversation.events import (
     TurnCompleted,
     TurnFailed,
     TurnInterrupted,
+    TurnProgress,
     TurnStarted,
 )
 from gateway.conversation.models import (
@@ -39,6 +41,11 @@ from gateway.conversation.models import (
     Turn,
     TurnStatus,
     UserMessageItem,
+)
+from gateway.conversation.progress import (
+    ProgressMode,
+    ProgressResult,
+    ProgressSnapshot,
 )
 from gateway.conversation.repository import Repository, TurnNotFoundError
 
@@ -66,6 +73,7 @@ class AgentThreadService:
         self._context_builder = context_builder or RepositoryContextBuilder(repository)
         self._events = event_broker or EventBroker()
         self._running: dict[UUID, _RunningTurn] = {}
+        self._latest_progress: dict[UUID, ProgressSnapshot] = {}
         self._lock = asyncio.Lock()
 
     async def initialize(self) -> None:
@@ -80,6 +88,8 @@ class AgentThreadService:
         if not message.strip():
             raise ValueError("message must not be empty")
         context = await self._context_builder.build(thread_id)
+        progress_enabled = await self._events.progress_requested(thread_id)
+        context = context.model_copy(update={"progress_enabled": progress_enabled})
         now = _now()
         turn = Turn(
             id=uuid4(),
@@ -152,11 +162,22 @@ class AgentThreadService:
         return await self._repository.get_thread(thread_id)
 
     async def subscribe(
-        self, thread_id: UUID, *, _ready: asyncio.Event | None = None
+        self,
+        thread_id: UUID,
+        *,
+        progress: ProgressMode = ProgressMode.OFF,
+        _ready: asyncio.Event | None = None,
     ) -> AsyncIterator[ThreadEvent]:
         await self._repository.get_thread(thread_id)
-        async for event in self._events.subscribe(thread_id, ready=_ready):
+        async for event in self._events.subscribe(
+            thread_id, progress=progress, ready=_ready
+        ):
             yield event
+
+    async def get_progress(self, thread_id: UUID) -> ProgressResult:
+        await self._repository.get_thread(thread_id)
+        async with self._lock:
+            return ProgressResult(progress=self._latest_progress.get(thread_id))
 
     async def wait_for_turn(self, turn_id: UUID) -> None:
         async with self._lock:
@@ -215,6 +236,24 @@ class AgentThreadService:
                         )
                     )
                     continue
+                if isinstance(agent_event, AgentProgressUpdated):
+                    progress = ProgressSnapshot(
+                        thread_id=turn.thread_id,
+                        turn_id=turn.id,
+                        message=agent_event.message,
+                        importance=agent_event.importance,
+                    )
+                    async with self._lock:
+                        self._latest_progress[turn.thread_id] = progress
+                    await self._events.publish(
+                        TurnProgress(
+                            thread_id=turn.thread_id,
+                            turn_id=turn.id,
+                            message=agent_event.message,
+                            importance=agent_event.importance,
+                        )
+                    )
+                    continue
                 item = _to_item(agent_event, turn)
                 if item.id not in started_items:
                     await self._events.publish(
@@ -257,6 +296,7 @@ class AgentThreadService:
             async with self._lock:
                 if self._running.get(turn.id) is running:
                     del self._running[turn.id]
+                self._latest_progress.pop(turn.thread_id, None)
 
     async def _finish(self, turn: Turn, status: TurnStatus) -> None:
         await self._repository.finish_turn(turn.id, status, _now())

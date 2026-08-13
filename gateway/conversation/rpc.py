@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from gateway.conversation.progress import ProgressMode
+
 
 class RpcSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -27,6 +29,10 @@ class ThreadParams(RpcSchema):
     thread_id: UUID
 
 
+class SubscriptionParams(ThreadParams):
+    progress: ProgressMode = ProgressMode.OFF
+
+
 class StartTurnParams(ThreadParams):
     message: str = Field(min_length=1)
 
@@ -41,6 +47,7 @@ class SteerTurnParams(TurnParams):
 
 class SubscriptionResult(RpcSchema):
     subscribed: UUID
+    progress: ProgressMode
 
 
 class UnsubscriptionResult(RpcSchema):

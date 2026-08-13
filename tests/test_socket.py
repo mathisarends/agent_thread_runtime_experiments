@@ -1,8 +1,30 @@
+from collections.abc import AsyncIterator
+
 from fastapi.testclient import TestClient
 
 from gateway.config import Settings
-from gateway.conversation.agent import FakeAgentRunner
+from gateway.conversation.agent import (
+    AgentContext,
+    AgentEvent,
+    AgentMessageCreated,
+    AgentProgressUpdated,
+    FakeAgentRunner,
+    TurnControl,
+)
 from main import create_app
+
+
+class ProgressRunner:
+    async def run(
+        self,
+        context: AgentContext,
+        input: str,
+        control: TurnControl,
+    ) -> AsyncIterator[AgentEvent]:
+        del input, control
+        assert context.progress_enabled
+        yield AgentProgressUpdated(message="Ich recherchiere passende Stellen.")
+        yield AgentMessageCreated(content="Fertig.")
 
 
 def test_json_rpc_commands_and_events_share_one_websocket() -> None:
@@ -22,7 +44,10 @@ def test_json_rpc_commands_and_events_share_one_websocket() -> None:
                     "params": {"thread_id": thread_id},
                 }
             )
-            assert socket.receive_json()["result"] == {"subscribed": thread_id}
+            assert socket.receive_json()["result"] == {
+                "subscribed": thread_id,
+                "progress": "off",
+            }
 
             socket.send_json(
                 {
@@ -67,3 +92,45 @@ def test_json_rpc_params_are_validated_by_pydantic() -> None:
     assert response["id"] == 1
     assert response["error"]["code"] == -32602
     assert "Invalid params" in response["error"]["message"]
+
+
+def test_proactive_progress_is_streamed_over_json_rpc() -> None:
+    app = create_app(Settings(database_path=":memory:"), ProgressRunner())
+
+    with TestClient(app) as client:
+        with client.websocket_connect("/v1/conversation") as socket:
+            socket.send_json({"jsonrpc": "2.0", "id": 1, "method": "thread.create"})
+            thread_id = socket.receive_json()["result"]["id"]
+            socket.send_json(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "thread.subscribe",
+                    "params": {"thread_id": thread_id, "progress": "proactive"},
+                }
+            )
+            assert socket.receive_json()["result"]["progress"] == "proactive"
+            socket.send_json(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "turn.start",
+                    "params": {"thread_id": thread_id, "message": "Find jobs"},
+                }
+            )
+
+            messages = []
+            while True:
+                message = socket.receive_json()
+                messages.append(message)
+                if message.get("params", {}).get("type") == "turn.completed":
+                    break
+
+    progress = [
+        message["params"]
+        for message in messages
+        if message.get("params", {}).get("type") == "turn.progress"
+    ]
+    assert [event["message"] for event in progress] == [
+        "Ich recherchiere passende Stellen."
+    ]

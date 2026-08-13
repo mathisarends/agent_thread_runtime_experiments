@@ -6,10 +6,12 @@ from uuid import UUID, uuid4
 from pydantic import Field
 
 from gateway.conversation.models import Item, ItemType, Schema
+from gateway.conversation.progress import ProgressImportance, ProgressMessage
 
 
 class AgentContext(Schema):
     items: tuple[Item, ...]
+    progress_enabled: bool = False
 
 
 class Steer(Schema):
@@ -75,12 +77,19 @@ class ToolResultCreated(Schema):
     output: Any
 
 
+class AgentProgressUpdated(Schema):
+    type: Literal["progress"] = "progress"
+    message: ProgressMessage
+    importance: ProgressImportance = ProgressImportance.NORMAL
+
+
 type AgentEvent = (
     AgentItemStarted
     | AgentMessageDelta
     | AgentMessageCreated
     | ToolCallCreated
     | ToolResultCreated
+    | AgentProgressUpdated
 )
 
 

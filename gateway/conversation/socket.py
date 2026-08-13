@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
+from gateway.conversation.progress import ProgressMode
 from gateway.conversation.repository import (
     ThreadNotFoundError,
     TurnAlreadyRunningError,
@@ -21,6 +22,7 @@ from gateway.conversation.rpc import (
     RpcSuccess,
     StartTurnParams,
     SteerTurnParams,
+    SubscriptionParams,
     SubscriptionResult,
     ThreadParams,
     TurnParams,
@@ -60,6 +62,7 @@ class JsonRpcConnection:
             "turn.start": self._start_turn,
             "turn.steer": self._steer_turn,
             "turn.interrupt": self._interrupt_turn,
+            "turn.progress.get": self._get_progress,
         }
 
     async def run(self) -> None:
@@ -129,17 +132,27 @@ class JsonRpcConnection:
         params = TurnParams.model_validate(raw)
         await self._service.interrupt_turn(params.thread_id, params.turn_id)
 
-    async def _subscribe(self, raw: dict[str, Any]) -> SubscriptionResult:
+    async def _get_progress(self, raw: dict[str, Any]) -> Any:
         params = ThreadParams.model_validate(raw)
+        return await self._service.get_progress(params.thread_id)
+
+    async def _subscribe(self, raw: dict[str, Any]) -> SubscriptionResult:
+        params = SubscriptionParams.model_validate(raw)
         await self._service.get_thread(params.thread_id)
-        if params.thread_id not in self._subscriptions:
-            ready = asyncio.Event()
-            self._subscriptions[params.thread_id] = asyncio.create_task(
-                self._forward_events(params.thread_id, ready),
-                name=f"socket-events-{params.thread_id}",
-            )
-            await ready.wait()
-        return SubscriptionResult(subscribed=params.thread_id)
+        previous = self._subscriptions.pop(params.thread_id, None)
+        if previous is not None:
+            previous.cancel()
+            await asyncio.gather(previous, return_exceptions=True)
+        ready = asyncio.Event()
+        self._subscriptions[params.thread_id] = asyncio.create_task(
+            self._forward_events(params.thread_id, params.progress, ready),
+            name=f"socket-events-{params.thread_id}",
+        )
+        await ready.wait()
+        return SubscriptionResult(
+            subscribed=params.thread_id,
+            progress=params.progress,
+        )
 
     async def _unsubscribe(self, raw: dict[str, Any]) -> UnsubscriptionResult:
         params = ThreadParams.model_validate(raw)
@@ -149,8 +162,12 @@ class JsonRpcConnection:
             await asyncio.gather(task, return_exceptions=True)
         return UnsubscriptionResult(unsubscribed=params.thread_id)
 
-    async def _forward_events(self, thread_id: UUID, ready: asyncio.Event) -> None:
-        async for event in self._service.subscribe(thread_id, _ready=ready):
+    async def _forward_events(
+        self, thread_id: UUID, progress: ProgressMode, ready: asyncio.Event
+    ) -> None:
+        async for event in self._service.subscribe(
+            thread_id, progress=progress, _ready=ready
+        ):
             await self._send(RpcNotification(method="thread.event", params=event))
 
     async def _send_error(

@@ -22,6 +22,7 @@ from gateway.conversation.agent import (
     AgentItemStarted,
     AgentMessageCreated,
     AgentMessageDelta,
+    AgentProgressUpdated,
     ToolCallCreated,
     ToolResultCreated,
     TurnControl,
@@ -34,11 +35,12 @@ from gateway.conversation.tools import default_tools
 class RecordingModel:
     def __init__(self) -> None:
         self.messages: list[Any] = []
+        self.tool_names: list[str] = []
 
     async def stream(
         self, messages: list[Any], **kwargs: Any
     ) -> AsyncIterator[Any]:
-        del kwargs
+        self.tool_names = [tool.name for tool in kwargs["tools"]]
         self.messages = messages
         yield StreamTextDelta(delta="A real ")
         yield StreamTextDelta(delta="model answer")
@@ -64,6 +66,32 @@ class ToolCallingModel:
         else:
             yield StreamTextDelta(delta="The sum is 5.")
             yield StreamEnd(completion="The sum is 5.")
+
+
+class ProgressCallingModel:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def stream(
+        self, messages: list[Any], **kwargs: Any
+    ) -> AsyncIterator[Any]:
+        del messages
+        self.calls += 1
+        tool_names = [tool.name for tool in kwargs["tools"]]
+        assert "report_progress" in tool_names
+        if self.calls == 1:
+            call = ToolCall(
+                id="call-progress",
+                function=Function(
+                    name="report_progress",
+                    arguments='{"message": "Ich recherchiere Stellen."}',
+                ),
+            )
+            yield StreamToolCall(tool_call=call)
+            yield StreamEnd(tool_calls=[call])
+        else:
+            yield StreamTextDelta(delta="Done")
+            yield StreamEnd(completion="Done")
 
 
 @pytest.mark.asyncio
@@ -110,6 +138,7 @@ async def test_runner_streams_llmify_history_as_item_lifecycle() -> None:
     assert isinstance(model.messages[1], UserMessage)
     assert isinstance(model.messages[2], AssistantMessage)
     assert isinstance(model.messages[3], UserMessage)
+    assert "report_progress" not in model.tool_names
 
 
 @pytest.mark.asyncio
@@ -138,3 +167,29 @@ async def test_runner_executes_registered_tool_and_correlates_result() -> None:
     assert tool_result.output == 5
     assert len(model.requests) == 2
     assert isinstance(model.requests[1][-1], ToolResultMessage)
+
+
+@pytest.mark.asyncio
+async def test_progress_tool_is_only_exposed_as_progress_event() -> None:
+    model = ProgressCallingModel()
+    runner = LlmifyAgentRunner(
+        cast(ChatModel, model),
+        system_prompt="Help.",
+        tools=default_tools(),
+    )
+
+    events = [
+        event
+        async for event in runner.run(
+            AgentContext(items=(), progress_enabled=True),
+            "Find jobs",
+            TurnControl(),
+        )
+    ]
+
+    progress = [event for event in events if isinstance(event, AgentProgressUpdated)]
+    assert [event.message for event in progress] == ["Ich recherchiere Stellen."]
+    assert not any(
+        isinstance(event, ToolCallCreated) and event.name == "report_progress"
+        for event in events
+    )

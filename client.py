@@ -89,6 +89,7 @@ class CliState:
     finished_turn_ids: set[str] = field(default_factory=set)
     subscribed_thread_ids: set[str] = field(default_factory=set)
     streaming_item_ids: set[str] = field(default_factory=set)
+    progress_modes: dict[str, str] = field(default_factory=dict)
 
 
 HELP = """Commands:
@@ -101,6 +102,8 @@ HELP = """Commands:
   /interrupt               interrupt the active turn
   /subscribe [THREAD_ID]   subscribe to live events
   /unsubscribe [THREAD_ID] unsubscribe from live events
+  /progress MODE           set off, on_request, or proactive for this thread
+  /status                  print the active turn's latest progress
   /rpc METHOD [JSON]       send an arbitrary JSON-RPC request
   /help                    show this help
   /quit                    close the connection
@@ -188,15 +191,33 @@ async def _execute_command(rpc: JsonRpcClient, state: CliState, line: str) -> No
             },
         )
         print("interrupt requested")
+    elif command == "/progress":
+        mode = _required(argument, "progress mode")
+        if mode not in {"off", "on_request", "proactive"}:
+            raise ValueError("progress mode must be off, on_request, or proactive")
+        target = _current_thread(state)
+        await rpc.request(
+            "thread.subscribe", {"thread_id": target, "progress": mode}
+        )
+        state.progress_modes[target] = mode
+        print(f"progress mode: {mode}")
+    elif command == "/status":
+        result = await rpc.request(
+            "turn.progress.get", {"thread_id": _current_thread(state)}
+        )
+        progress = result["progress"]
+        print(progress["message"] if progress else "no active progress")
     elif command == "/subscribe":
         target = argument.strip() or _current_thread(state)
         await rpc.request("thread.subscribe", {"thread_id": target})
         state.subscribed_thread_ids.add(target)
+        state.progress_modes[target] = "off"
         print(f"subscribed to {target} (future live events only)")
     elif command == "/unsubscribe":
         target = argument.strip() or _current_thread(state)
         await rpc.request("thread.unsubscribe", {"thread_id": target})
         state.subscribed_thread_ids.discard(target)
+        state.progress_modes.pop(target, None)
         print(f"unsubscribed from {target}")
     elif command == "/rpc":
         await _raw_rpc(rpc, argument)
@@ -217,6 +238,7 @@ async def _use_thread(rpc: JsonRpcClient, state: CliState, thread_id: str) -> No
     snapshot = await rpc.request("thread.get", {"thread_id": thread_id})
     await rpc.request("thread.subscribe", {"thread_id": thread_id})
     state.subscribed_thread_ids.add(thread_id)
+    state.progress_modes[thread_id] = "off"
     state.thread_id = thread_id
     active = next(
         (turn for turn in snapshot["turns"] if turn["status"] == "running"), None
@@ -314,6 +336,8 @@ def _render_event(
             print(f"\n{prefix}result> {json.dumps(item['output'], ensure_ascii=False)}")
     elif event_type == "turn.failed":
         print(f"\n{prefix}[turn failed: {event['error']}]")
+    elif event_type == "turn.progress":
+        print(f"\n{prefix}[progress] {event['message']}")
     elif event_type.startswith("turn.") and event_type != "turn.started":
         print(f"\n{prefix}[{event_type}]")
 
