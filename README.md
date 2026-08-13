@@ -1,8 +1,27 @@
 # Minimal Agent Thread Runtime
 
 The runtime owns persistent conversation state independently of its transport. It
-uses SQLite, permits one active turn per thread, fans live events out to multiple
+uses Pydantic schemas, SQLModel-backed SQLite persistence, and Dishka dependency
+injection. It permits one active turn per thread, fans live events out to multiple
 subscribers, and keeps the agent behind an `AgentRunner` protocol.
+
+The small gateway is split by responsibility:
+
+```text
+gateway/
+├── config.py                 Pydantic application settings
+├── container.py              Dishka composition root
+└── conversation/
+    ├── models.py             Pydantic domain schemas
+    ├── events.py             Pydantic event schemas and live broker
+    ├── database.py           SQLModel tables and SQLite engine
+    ├── repository.py         persistence boundary and mappings
+    ├── agent.py              runner protocol and control channel
+    ├── service.py            canonical orchestration
+    ├── rpc.py                JSON-RPC Pydantic schemas
+    ├── socket.py             connection handling
+    └── routes.py             injected WebSocket route
+```
 
 The only network endpoint is a long-lived JSON-RPC 2.0 WebSocket:
 
