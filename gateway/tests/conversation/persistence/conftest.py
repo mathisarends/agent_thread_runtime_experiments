@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -8,11 +9,13 @@ from gateway.conversation.persistence.sqlmodel import SQLModelRepository
 
 
 @pytest_asyncio.fixture
-async def repository() -> SQLModelRepository:
+async def repository() -> AsyncIterator[SQLModelRepository]:
     """A ready-to-use repository backed by a fresh in-memory database."""
-    instance = SQLModelRepository(create_sqlite_engine(":memory:"))
+    engine = create_sqlite_engine(":memory:")
+    instance = SQLModelRepository(engine)
     await instance.initialize()
-    return instance
+    yield instance
+    engine.dispose()
 
 
 @pytest_asyncio.fixture

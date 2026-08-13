@@ -1,6 +1,8 @@
 import pytest
 from gateway.conversation.agents.contracts import (
     AgentContext,
+    AgentMessageCreated,
+    ControlMessageType,
     FakeAgentRunner,
     Interrupt,
     Steer,
@@ -39,19 +41,18 @@ async def test_fake_agent_runner_echoes_the_input() -> None:
 
     events = [
         event
-        async for event in runner.run(
-            AgentContext(items=()), "hello", TurnControl()
-        )
+        async for event in runner.run(AgentContext(items=()), "hello", TurnControl())
     ]
 
     assert len(events) == 1
-    assert events[0].content == "Echo: hello"
+    event = events[0]
+    assert isinstance(event, AgentMessageCreated)
+    assert event.content == "Echo: hello"
 
 
 def test_steer_and_interrupt_are_frozen_and_distinguishable_by_type() -> None:
     steer = Steer(message="go left")
     interrupt = Interrupt()
 
-    assert steer.type == "steer"
-    assert interrupt.type == "interrupt"
-    assert steer != interrupt
+    assert steer.type is ControlMessageType.STEER
+    assert interrupt.type is ControlMessageType.INTERRUPT

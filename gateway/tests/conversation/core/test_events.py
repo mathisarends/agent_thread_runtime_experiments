@@ -52,7 +52,9 @@ async def test_non_progress_events_reach_every_subscriber_regardless_of_mode() -
     turn_id = uuid4()
     off_ready = asyncio.Event()
 
-    off_mode = asyncio.create_task(_first(broker, thread_id, ProgressMode.OFF, off_ready))
+    off_mode = asyncio.create_task(
+        _first(broker, thread_id, ProgressMode.OFF, off_ready)
+    )
     await off_ready.wait()
     await broker.publish(TurnStarted(thread_id=thread_id, turn_id=turn_id))
 

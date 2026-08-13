@@ -184,7 +184,12 @@ async def test_runner_streams_llmify_history_as_item_lifecycle() -> None:
         AgentMessageDelta,
         AgentMessageCreated,
     ]
-    assert len({event.item_id for event in events}) == 1
+    item_ids = {
+        event.item_id
+        for event in events
+        if isinstance(event, (AgentItemStarted, AgentMessageDelta, AgentMessageCreated))
+    }
+    assert len(item_ids) == 1
     assert isinstance(events[-1], AgentMessageCreated)
     assert events[-1].content == "A real model answer"
     assert len(model.messages) == 4
@@ -276,7 +281,9 @@ async def test_completion_only_stream_is_still_emitted_as_a_message() -> None:
         AgentMessageDelta,
         AgentMessageCreated,
     ]
-    assert events[-1].content == "Whole answer at once"
+    last_event = events[-1]
+    assert isinstance(last_event, AgentMessageCreated)
+    assert last_event.content == "Whole answer at once"
 
 
 @pytest.mark.asyncio
@@ -305,7 +312,9 @@ async def test_async_tool_results_are_awaited() -> None:
         async for event in runner.run(AgentContext(items=()), "Double 4", TurnControl())
     ]
 
-    tool_result = next(event for event in events if isinstance(event, ToolResultCreated))
+    tool_result = next(
+        event for event in events if isinstance(event, ToolResultCreated)
+    )
     assert tool_result.output == 8
 
 

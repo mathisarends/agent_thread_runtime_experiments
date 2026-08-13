@@ -90,9 +90,11 @@ async def test_sqlmodel_repository_reads_the_original_sqlite_schema(
             ),
         )
 
-    repository = SQLModelRepository(create_sqlite_engine(str(database)))
+    engine = create_sqlite_engine(str(database))
+    repository = SQLModelRepository(engine)
     await repository.initialize()
     snapshot = await repository.get_thread(thread_id)
+    engine.dispose()
 
     assert snapshot.turns[0].status is TurnStatus.COMPLETED
     assert isinstance(snapshot.items[0], AgentMessageItem)
@@ -204,7 +206,8 @@ async def test_initialize_recovers_turns_left_running_by_an_unclean_shutdown(
     database = tmp_path / "recovery.db"
     thread_id, turn_id, item_id = uuid4(), uuid4(), uuid4()
 
-    first_run = SQLModelRepository(create_sqlite_engine(str(database)))
+    first_engine = create_sqlite_engine(str(database))
+    first_run = SQLModelRepository(first_engine)
     await first_run.initialize()
     await first_run.create_thread(Thread(id=thread_id, created_at=datetime.now(UTC)))
     await first_run.create_turn(
@@ -222,10 +225,13 @@ async def test_initialize_recovers_turns_left_running_by_an_unclean_shutdown(
             content="still running when the process died",
         ),
     )
+    first_engine.dispose()
 
-    second_run = SQLModelRepository(create_sqlite_engine(str(database)))
+    second_engine = create_sqlite_engine(str(database))
+    second_run = SQLModelRepository(second_engine)
     await second_run.initialize()
     snapshot = await second_run.get_thread(thread_id)
+    second_engine.dispose()
 
     assert snapshot.turns[0].status is TurnStatus.INTERRUPTED
     assert snapshot.turns[0].completed_at is not None

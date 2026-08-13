@@ -55,7 +55,7 @@ def test_schema_models_are_frozen() -> None:
     )
 
     with pytest.raises(ValidationError):
-        item.content = "changed"  # type: ignore[misc]
+        item.content = "changed"
 
 
 def test_item_union_discriminates_on_type() -> None:

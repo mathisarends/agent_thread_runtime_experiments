@@ -17,7 +17,13 @@ from gateway.conversation.agents.contracts import (
     ToolResultCreated,
     TurnControl,
 )
-from gateway.conversation.core.events import ThreadEvent
+from gateway.conversation.core.events import (
+    ItemCompleted,
+    ItemDelta,
+    ItemStarted,
+    ThreadEvent,
+    TurnFailed,
+)
 from gateway.conversation.core.models import (
     AgentMessageItem,
     ItemType,
@@ -200,8 +206,14 @@ async def test_turn_is_persisted_and_fanned_out_in_order(
     ]
     assert [event.type for event in first_events] == expected
     assert [event.type for event in second_events] == expected
-    assert first_events[1].item_id == first_events[2].item.id
-    assert first_events[3].item_id == first_events[4].item.id
+    first_started, first_completed = first_events[1], first_events[2]
+    second_started, second_completed = first_events[3], first_events[4]
+    assert isinstance(first_started, ItemStarted)
+    assert isinstance(first_completed, ItemCompleted)
+    assert isinstance(second_started, ItemStarted)
+    assert isinstance(second_completed, ItemCompleted)
+    assert first_started.item_id == first_completed.item.id
+    assert second_started.item_id == second_completed.item.id
 
     snapshot = await service.get_thread(thread.id)
     assert snapshot.turns[0].status is TurnStatus.COMPLETED
@@ -358,7 +370,7 @@ async def test_message_deltas_start_and_complete_the_item(
         "item.completed",
         "turn.completed",
     ]
-    deltas = [event for event in thread_events if event.type == "item.delta"]
+    deltas = [event for event in thread_events if isinstance(event, ItemDelta)]
     assert [delta.delta for delta in deltas] == ["Hel", "lo"]
 
 
@@ -381,7 +393,9 @@ async def test_runner_failure_marks_the_turn_as_failed(
         "item.completed",
         "turn.failed",
     ]
-    assert thread_events[-1].error == "boom"
+    last_event = thread_events[-1]
+    assert isinstance(last_event, TurnFailed)
+    assert last_event.error == "boom"
 
     snapshot = await service.get_thread(thread.id)
     assert snapshot.turns[0].status is TurnStatus.FAILED
@@ -425,9 +439,7 @@ async def test_on_request_enables_agent_and_retains_latest_progress(
     service = await make_service(runner)
     thread = await service.create_thread()
     ready = asyncio.Event()
-    subscription = asyncio.create_task(
-        _hold_subscription(service, thread.id, ready)
-    )
+    subscription = asyncio.create_task(_hold_subscription(service, thread.id, ready))
     await ready.wait()
 
     turn = await service.start_turn(thread.id, "Find jobs")
