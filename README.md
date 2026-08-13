@@ -41,6 +41,11 @@ The only network endpoint is a long-lived JSON-RPC 2.0 WebSocket:
 ws://127.0.0.1:8000/v1/conversation
 ```
 
+Machine-readable protocol types are available as JSON Schema at
+`GET /v1/conversation/schema`. The same request, response, and event models are
+also registered under `components.schemas` in `GET /openapi.json` for external
+type generation. No generated client is bundled with the runtime.
+
 Run it with:
 
 ```powershell

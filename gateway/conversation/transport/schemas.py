@@ -173,3 +173,21 @@ class RpcNotification(RpcSchema):
         RpcNotificationMethod.THREAD_EVENT
     )
     params: ThreadEvent
+
+
+type ConversationServerMessage = RpcSuccess | RpcFailure | RpcNotification
+
+
+class ConversationProtocol(RpcSchema):
+    """Bidirectional message types used by the conversation WebSocket."""
+
+    client_message: ConversationRequest
+    server_message: ConversationServerMessage
+
+
+CONVERSATION_SERVER_MESSAGE_ADAPTER: TypeAdapter[ConversationServerMessage] = (
+    TypeAdapter(ConversationServerMessage)
+)
+CONVERSATION_PROTOCOL_ADAPTER: TypeAdapter[ConversationProtocol] = TypeAdapter(
+    ConversationProtocol
+)

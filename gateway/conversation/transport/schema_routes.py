@@ -1,0 +1,66 @@
+from collections.abc import Callable
+from typing import Any
+
+from fastapi import APIRouter, FastAPI
+from fastapi.responses import JSONResponse
+from pydantic import TypeAdapter
+
+from gateway.conversation.transport.schemas import (
+    CONVERSATION_PROTOCOL_ADAPTER,
+    CONVERSATION_REQUEST_ADAPTER,
+    CONVERSATION_SERVER_MESSAGE_ADAPTER,
+)
+
+schema_router = APIRouter(tags=["conversation schema"])
+
+
+@schema_router.get(
+    "/v1/conversation/schema",
+    response_class=JSONResponse,
+    summary="Conversation WebSocket JSON Schema",
+    description=(
+        "JSON Schema for client-to-server requests and server-to-client messages "
+        "on `/v1/conversation`."
+    ),
+)
+async def conversation_schema() -> JSONResponse:
+    return JSONResponse(
+        CONVERSATION_PROTOCOL_ADAPTER.json_schema(mode="serialization"),
+        media_type="application/schema+json",
+    )
+
+
+def install_schema_router(application: FastAPI) -> None:
+    """Expose the schema endpoint and add WebSocket types to OpenAPI components."""
+    application.include_router(schema_router)
+    build_openapi = _openapi_factory(application.openapi)
+    object.__setattr__(application, "openapi", build_openapi)
+
+
+def _openapi_factory(
+    base_openapi: Callable[[], dict[str, Any]],
+) -> Callable[[], dict[str, Any]]:
+    def build_openapi() -> dict[str, Any]:
+        document = base_openapi()
+        schemas = document.setdefault("components", {}).setdefault("schemas", {})
+        _add_schema(schemas, "ConversationRequest", CONVERSATION_REQUEST_ADAPTER)
+        _add_schema(
+            schemas,
+            "ConversationServerMessage",
+            CONVERSATION_SERVER_MESSAGE_ADAPTER,
+        )
+        return document
+
+    return build_openapi
+
+
+def _add_schema(
+    components: dict[str, Any], name: str, adapter: TypeAdapter[Any]
+) -> None:
+    schema = adapter.json_schema(
+        mode="serialization",
+        ref_template="#/components/schemas/{model}",
+    )
+    definitions = schema.pop("$defs", {})
+    components.update(definitions)
+    components[name] = schema

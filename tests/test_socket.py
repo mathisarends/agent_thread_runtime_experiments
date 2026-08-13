@@ -46,6 +46,29 @@ def test_rpc_request_union_uses_method_as_discriminator() -> None:
     assert request.method is RpcMethod.THREAD_GET
 
 
+def test_conversation_types_are_exposed_as_json_schema_and_openapi_components(
+) -> None:
+    app = create_app(Settings(database_path=":memory:"), FakeAgentRunner())
+
+    with TestClient(app) as client:
+        schema_response = client.get("/v1/conversation/schema")
+        openapi = client.get("/openapi.json").json()
+
+    assert schema_response.status_code == 200
+    assert schema_response.headers["content-type"].startswith(
+        "application/schema+json"
+    )
+    protocol_schema = schema_response.json()
+    assert "client_message" in protocol_schema["properties"]
+    assert "server_message" in protocol_schema["properties"]
+
+    schemas = openapi["components"]["schemas"]
+    request_schema = schemas["ConversationRequest"]
+    assert request_schema["discriminator"]["propertyName"] == "method"
+    assert len(request_schema["oneOf"]) == 8
+    assert "ConversationServerMessage" in schemas
+
+
 def test_json_rpc_commands_and_events_share_one_websocket() -> None:
     app = create_app(Settings(database_path=":memory:"), FakeAgentRunner())
 

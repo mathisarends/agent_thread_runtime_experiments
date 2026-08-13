@@ -9,6 +9,7 @@ from gateway.container import create_container
 from gateway.conversation.agents.contracts import AgentRunner
 from gateway.conversation.core.service import AgentThreadService
 from gateway.conversation.transport.routes import router as conversation_router
+from gateway.conversation.transport.schema_routes import install_schema_router
 
 
 def create_app(
@@ -19,8 +20,7 @@ def create_app(
     container = create_container(config, runner)
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        del app
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         service = await container.get(AgentThreadService)
         await service.initialize()
         yield
@@ -29,6 +29,7 @@ def create_app(
     application = FastAPI(title="Agent Thread Runtime", lifespan=lifespan)
     application.include_router(conversation_router)
     setup_dishka(container, application)
+    install_schema_router(application)
     return application
 
 
