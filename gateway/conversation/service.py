@@ -15,6 +15,7 @@ from .agent import (
     ToolResultCreated,
     TurnControl,
 )
+from .context import RepositoryContextBuilder
 from .events import (
     EventBroker,
     ItemCompleted,
@@ -38,15 +39,6 @@ from .models import (
 from .repository import Repository, TurnNotFoundError
 
 
-class _RepositoryContextBuilder:
-    def __init__(self, repository: Repository) -> None:
-        self._repository = repository
-
-    async def build(self, thread_id: UUID) -> AgentContext:
-        snapshot = await self._repository.get_thread(thread_id)
-        return AgentContext(items=snapshot.items)
-
-
 class _RunningTurn:
     def __init__(self, thread_id: UUID, control: TurnControl) -> None:
         self.thread_id = thread_id
@@ -67,7 +59,7 @@ class AgentThreadService:
     ) -> None:
         self._repository = repository
         self._runner = runner
-        self._context_builder = context_builder or _RepositoryContextBuilder(repository)
+        self._context_builder = context_builder or RepositoryContextBuilder(repository)
         self._events = event_broker or EventBroker()
         self._running: dict[UUID, _RunningTurn] = {}
         self._lock = asyncio.Lock()

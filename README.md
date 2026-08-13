@@ -4,6 +4,8 @@ The runtime owns persistent conversation state independently of its transport. I
 uses Pydantic schemas, SQLModel-backed SQLite persistence, and Dishka dependency
 injection. It permits one active turn per thread, fans live events out to multiple
 subscribers, and keeps the agent behind an `AgentRunner` protocol.
+The default runner uses [`llmify`](https://github.com/mathisarends/llmify) with
+OpenAI; tests and custom integrations can override it at the container edge.
 
 The small gateway is split by responsibility:
 
@@ -17,6 +19,8 @@ gateway/
     ├── database.py           SQLModel tables and SQLite engine
     ├── repository.py         persistence boundary and mappings
     ├── agent.py              runner protocol and control channel
+    ├── context.py            persisted-context builder
+    ├── llmify_runner.py      minimal real LLM adapter
     ├── service.py            canonical orchestration
     ├── rpc.py                JSON-RPC Pydantic schemas
     ├── socket.py             connection handling
@@ -34,6 +38,18 @@ Run it with:
 ```powershell
 uv run python main.py
 ```
+
+Configuration is loaded from environment variables and a local `.env` file:
+
+```dotenv
+OPENAI_API_KEY=sk-...
+AGENT_MODEL=gpt-5.4-mini
+AGENT_SYSTEM_PROMPT=You are a helpful assistant.
+AGENT_THREAD_DB=agent_threads.db
+```
+
+Only `OPENAI_API_KEY` is required. `.env` and SQLite database files are ignored
+by Git.
 
 In another terminal, start the interactive client:
 

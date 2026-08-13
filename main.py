@@ -1,4 +1,3 @@
-import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -16,9 +15,7 @@ def create_app(
     settings: Settings | None = None,
     runner: AgentRunner | None = None,
 ) -> FastAPI:
-    config = settings or Settings(
-        database_path=os.getenv("AGENT_THREAD_DB", "agent_threads.db")
-    )
+    config = settings or Settings()
     container = create_container(config, runner)
 
     @asynccontextmanager
